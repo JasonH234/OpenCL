@@ -319,16 +319,16 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
 
     // Allocate results
     lbm_context->d_results = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
-				  sizeof(double)*(GROUPSIZE), NULL, &err);
+				  sizeof(float)*(GROUPSIZE), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for results", err);
-    double * results = (double*) malloc(sizeof(double)*(GROUPSIZE));
+    float * results = (float*) malloc(sizeof(float)*(GROUPSIZE));
     //initialise empty
     for(int i = 0; i<GROUPSIZE; i++)
       results[i] = 0;
     //Write results
     err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_results, CL_FALSE, 0, 
-			       sizeof(double)*(GROUPSIZE), results, 0, NULL, NULL);
+			       sizeof(float)*(GROUPSIZE), results, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write results to device", err);
     free(results);

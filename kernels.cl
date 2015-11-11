@@ -4,7 +4,7 @@
 
 /* struct to hold the 'speed' values */
 typedef struct {
-    double speeds[NSPEEDS];
+    float speeds[NSPEEDS];
 } speed_t;
 
 /* struct to hold the parameter values */
@@ -13,9 +13,9 @@ typedef struct {
     int ny;            /* no. of cells in y-direction */
     int max_iters;      /* no. of iterations */
     int reynolds_dim;  /* dimension for Reynolds number */
-    double density;       /* density per link */
-    double accel;         /* density redistribution */
-    double omega;         /* relaxation parameter */
+    float density;       /* density per link */
+    float accel;         /* density redistribution */
+    float omega;         /* relaxation parameter */
 } param_t;
 
 typedef enum { ACCEL_ROW=0, ACCEL_COLUMN=1 } accel_e;
@@ -30,7 +30,7 @@ __kernel void accelerate_flow(const param_t params, const accel_area_t accel_are
 {
     int ii,jj;     /* generic counters */
     
-    double w1,w2;  /* weighting factors */
+    float w1,w2;  /* weighting factors */
  /* compute weighting factors */
     w1 = params.density * params.accel / 9.0;
     w2 = params.density * params.accel / 36.0;
@@ -130,16 +130,16 @@ __kernel void collision(const param_t params, __global speed_t* cells,
 	int ii = get_global_id(0);
 	int jj = get_global_id(1);
 	int kk = 0;
-	const double c_sq = 1.0/3.0;
-	const double w0 = 4.0/9.0;
-	const double w1 = 1.0/9.0;
-	const double w2 = 1.0/36.0;
+	const float c_sq = 1.0/3.0;
+	const float w0 = 4.0/9.0;
+	const float w1 = 1.0/9.0;
+	const float w2 = 1.0/36.0;
 
-	double u_x, u_y;
-	double u_sq;
-	double local_density;
-	double u[NSPEEDS];
-	double d_equ[NSPEEDS];
+	float u_x, u_y;
+	float u_sq;
+	float local_density;
+	float u[NSPEEDS];
+	float d_equ[NSPEEDS];
 	if(!obstacles[ii*params.nx +jj])
 	{
 		local_density = 0.0;
@@ -223,9 +223,9 @@ __kernel void collision(const param_t params, __global speed_t* cells,
 double get_velocity(const speed_t cell)
 {
 	int kk = 0;
-	double local_density;
-	double u_x;
-	double u_y;
+	float local_density;
+	float u_x;
+	float u_y;
 
 	local_density = 0.0;
 		for (kk = 0; kk < NSPEEDS; kk++)
@@ -253,7 +253,7 @@ double get_velocity(const speed_t cell)
 }
 
 __kernel void av_velocity(const param_t params, __global speed_t * cells, __global int* obstacles,
-	      			 __local double* scratch, __global double* results)
+	      			 __local float* scratch, __global float* results)
 {
 	int global_id = get_global_id(0);
         int local_id = get_local_id(0);

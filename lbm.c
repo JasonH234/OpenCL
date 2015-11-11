@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
     speed_t* cells     = NULL;    /* grid containing fluid densities */
     speed_t* tmp_cells = NULL;    /* scratch space */
     int*     obstacles = NULL;    /* grid indicating which cells are blocked */
-    double*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
+    float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
 
     int    ii;                    /*  generic counter */
     struct timeval timstr;        /* structure to hold elapsed time */
@@ -87,7 +87,6 @@ int main(int argc, char* argv[])
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file, &device_id);
 
     initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
-    cl_mem d_cells, d_tmp_cells, d_obstacles;
     opencl_initialise(device_id, params, accel_area, &lbm_context, cells, tmp_cells, obstacles);
  
    /* iterate for max_iters timesteps */
@@ -118,9 +117,12 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_velocity, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_velocity, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_velocity, 2, sizeof(cl_mem), &lbm_context.d_obstacles);
-      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(cl_double)*LOCALSIZE,NULL);
+      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(float)*LOCALSIZE,NULL);
       err |= clSetKernelArg(lbm_context.k_velocity, 4, sizeof(cl_mem), &lbm_context.d_results);
      
+      if (err != CL_SUCCESS)
+	DIE("OpenCL error %d, could not set kernel arguments", err);
+
 
       //Run kernel with auto work group sizes
       const size_t global[2] = {params.ny, params.nx};
@@ -133,8 +135,6 @@ int main(int argc, char* argv[])
       const size_t g = GLOBALSIZE;
       const size_t l = LOCALSIZE;
 
-      if (err != CL_SUCCESS)
-	DIE("OpenCL error %d, could not set kernel arguments", err);
       int tot_cells = 0;
       for (ii = 0; ii < params.ny; ii++)
 	{
@@ -165,18 +165,15 @@ int main(int argc, char* argv[])
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not run kernel",err);
 
-      double * results = (double*) malloc(sizeof(double)*(GROUPSIZE));
-      // Read from kernel buffers
-      //err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_cells, CL_TRUE, 0, 
-      //		sizeof(speed_t)*(params.nx*params.ny),cells,0,NULL,NULL);
-      	    err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
-				      sizeof(double)*(GROUPSIZE),results,0,NULL,NULL);
+      float * results = (float*) malloc(sizeof(float)*(GROUPSIZE));
+      err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
+				      sizeof(float)*(GROUPSIZE),results,0,NULL,NULL);
 	    for(int x = 0; x < (GROUPSIZE); x ++)
 	      {
-		//		printf("results: %.12E\n", results[x]);
+		//	printf("results: %.12E\n", results[x]);
 		av_vels[ii]+=results[x];
 	      }
-	    av_vels[ii] = av_vels[ii]/ (double) tot_cells;
+	    av_vels[ii] = av_vels[ii]/ (float) tot_cells;
 
 	    free(results);
       if(err != CL_SUCCESS)
@@ -222,16 +219,16 @@ int main(int argc, char* argv[])
 }
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, speed_t* cells, int* obstacles, double* av_vels)
+    const param_t params, speed_t* cells, int* obstacles, float* av_vels)
 {
     FILE* fp;                     /* file pointer */
     int ii,jj,kk;                 /* generic counters */
-    const double c_sq = 1.0/3.0;  /* sq. of speed of sound */
-    double local_density;         /* per grid cell sum of densities */
-    double pressure;              /* fluid pressure in grid cell */
-    double u_x;                   /* x-component of velocity in grid cell */
-    double u_y;                   /* y-component of velocity in grid cell */
-    double u;                     /* norm--root of summed squares--of u_x and u_y */
+    const float c_sq = 1.0/3.0;  /* sq. of speed of sound */
+    float local_density;         /* per grid cell sum of densities */
+    float pressure;              /* fluid pressure in grid cell */
+    float u_x;                   /* x-component of velocity in grid cell */
+    float u_y;                   /* y-component of velocity in grid cell */
+    float u;                     /* norm--root of summed squares--of u_x and u_y */
 
     fp = fopen(final_state_file, "w");
 
@@ -307,17 +304,17 @@ void write_values(const char * final_state_file, const char * av_vels_file,
     fclose(fp);
 }
 
-double calc_reynolds(const param_t params, double av_vel)
+float calc_reynolds(const param_t params, float av_vel)
 {
-    const double viscosity = 1.0 / 6.0 * (2.0 / params.omega - 1.0);
+    const float viscosity = 1.0 / 6.0 * (2.0 / params.omega - 1.0);
 
     return av_vel * params.reynolds_dim / viscosity;
 }
 
-double total_density(const param_t params, speed_t* cells)
+float total_density(const param_t params, speed_t* cells)
 {
     int ii,jj,kk;        /* generic counters */
-    double total = 0.0;  /* accumulator */
+    float total = 0.0;  /* accumulator */
 
     for (ii = 0; ii < params.ny; ii++)
     {
