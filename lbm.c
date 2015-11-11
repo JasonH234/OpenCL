@@ -103,11 +103,6 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_flow, 2, sizeof(cl_mem), &d_cells);
       err |= clSetKernelArg(lbm_context.k_flow, 3, sizeof(cl_mem), &d_obstacles);
 
-      /*err = clSetKernelArg(lbm_context.k_flow2, 0, sizeof(param_t), &params);
-      err |= clSetKernelArg(lbm_context.k_flow2, 1, sizeof(accel_area_t), &accel_area);
-      err |= clSetKernelArg(lbm_context.k_flow2, 2, sizeof(cl_mem), &d_cells);
-      err |= clSetKernelArg(lbm_context.k_flow2, 3, sizeof(cl_mem), &d_obstacles);*/
-
       err |= clSetKernelArg(k_propagate, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(k_propagate, 1, sizeof(cl_mem), &d_cells);
       err |= clSetKernelArg(k_propagate, 2, sizeof(cl_mem), &d_tmp_cells);
@@ -122,6 +117,11 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(k_collision, 2, sizeof(cl_mem), &d_tmp_cells);
       err |= clSetKernelArg(k_collision, 3, sizeof(cl_mem), &d_obstacles);
 
+      //Run kernel with auto work group sizes
+      const size_t global[2] = {params.ny, params.nx};
+      const size_t global2 = (accel_area.col_or_row == ACCEL_COLUMN) ? params.ny : params.nx;
+
+
       if (err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not set kernel arguments", err);
 
@@ -132,13 +132,9 @@ int main(int argc, char* argv[])
 
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not write to buffer",err);
-      
-      
-      //Run kernel with auto work group sizes
-      const size_t global[2] = {params.ny, params.nx};
-      
+           
 
-      err = clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_flow,1,NULL,global,NULL,0, NULL, NULL);
+      err = clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_flow,1,NULL,&global2,NULL,0, NULL, NULL);
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,k_propagate,2,NULL,global,NULL,0, NULL, NULL);
 
@@ -153,10 +149,6 @@ int main(int argc, char* argv[])
       // Read from kernel buffers
       err = clEnqueueReadBuffer(lbm_context.queue, d_cells, CL_TRUE, 0, 
 				sizeof(speed_t)*(params.nx*params.ny),cells,0,NULL,NULL);
-      // Read from kernel buffers
-      err |= clEnqueueReadBuffer(lbm_context.queue, d_tmp_cells, CL_TRUE, 0, 
-				sizeof(speed_t)*(params.nx*params.ny),tmp_cells,0,NULL,NULL);
-
       
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not read buffer", err);
