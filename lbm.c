@@ -83,14 +83,12 @@ int main(int argc, char* argv[])
 
     int device_id;
     lbm_context_t lbm_context;
-    cl_kernel kernel, k_propagate, k_collision, k_av_vel;
 
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file, &device_id);
 
     initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
     cl_mem d_cells, d_tmp_cells, d_obstacles;
-    opencl_initialise(device_id, params, accel_area, &lbm_context, &kernel, &k_propagate, &k_collision, &k_av_vel, cells, tmp_cells, obstacles,
-		      &d_cells, &d_tmp_cells, &d_obstacles);
+    opencl_initialise(device_id, params, accel_area, &lbm_context, cells, tmp_cells, obstacles);
  
    /* iterate for max_iters timesteps */
     gettimeofday(&timstr,NULL);
@@ -100,35 +98,40 @@ int main(int argc, char* argv[])
     // kernel arguments
       err = clSetKernelArg(lbm_context.k_flow, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_flow, 1, sizeof(accel_area_t), &accel_area);
-      err |= clSetKernelArg(lbm_context.k_flow, 2, sizeof(cl_mem), &d_cells);
-      err |= clSetKernelArg(lbm_context.k_flow, 3, sizeof(cl_mem), &d_obstacles);
+      err |= clSetKernelArg(lbm_context.k_flow, 2, sizeof(cl_mem), &lbm_context.d_cells);
+      err |= clSetKernelArg(lbm_context.k_flow, 3, sizeof(cl_mem), &lbm_context.d_obstacles);
 
-      err |= clSetKernelArg(k_propagate, 0, sizeof(param_t), &params);
-      err |= clSetKernelArg(k_propagate, 1, sizeof(cl_mem), &d_cells);
-      err |= clSetKernelArg(k_propagate, 2, sizeof(cl_mem), &d_tmp_cells);
+      err |= clSetKernelArg(lbm_context.k_propagate, 0, sizeof(param_t), &params);
+      err |= clSetKernelArg(lbm_context.k_propagate, 1, sizeof(cl_mem), &lbm_context.d_cells);
+      err |= clSetKernelArg(lbm_context.k_propagate, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
 
-      err |= clSetKernelArg(kernel, 0, sizeof(param_t), &params);
-      err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &d_cells);
-      err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &d_tmp_cells);
-      err |= clSetKernelArg(kernel, 3, sizeof(cl_mem), &d_obstacles);
+      err |= clSetKernelArg(lbm_context.k_rebound, 0, sizeof(param_t), &params);
+      err |= clSetKernelArg(lbm_context.k_rebound, 1, sizeof(cl_mem), &lbm_context.d_cells);
+      err |= clSetKernelArg(lbm_context.k_rebound, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
+      err |= clSetKernelArg(lbm_context.k_rebound, 3, sizeof(cl_mem), &lbm_context.d_obstacles);
       
-      err |= clSetKernelArg(k_collision, 0, sizeof(param_t), &params);
-      err |= clSetKernelArg(k_collision, 1, sizeof(cl_mem), &d_cells);
-      err |= clSetKernelArg(k_collision, 2, sizeof(cl_mem), &d_tmp_cells);
-      err |= clSetKernelArg(k_collision, 3, sizeof(cl_mem), &d_obstacles);
+      err |= clSetKernelArg(lbm_context.k_collision, 0, sizeof(param_t), &params);
+      err |= clSetKernelArg(lbm_context.k_collision, 1, sizeof(cl_mem), &lbm_context.d_cells);
+      err |= clSetKernelArg(lbm_context.k_collision, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
+      err |= clSetKernelArg(lbm_context.k_collision, 3, sizeof(cl_mem), &lbm_context.d_obstacles);
+
+      err |= clSetKernelArg(lbm_context.k_velocity, 0, sizeof(param_t), &params);
+      err |= clSetKernelArg(lbm_context.k_velocity, 1, sizeof(cl_mem), &lbm_context.d_cells);
+      err |= clSetKernelArg(lbm_context.k_velocity, 2, sizeof(cl_mem), &lbm_context.d_obstacles);
+      //err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(double)*params.nx*params.ny,NULL);
+      //err |= clSetKernelArg(lbm_context.k_velocity, 4, sizeof(cl_mem), &lbm_context.d_results);
+     
 
       //Run kernel with auto work group sizes
       const size_t global[2] = {params.ny, params.nx};
       const size_t global2 = (accel_area.col_or_row == ACCEL_COLUMN) ? params.ny : params.nx;
-
-
+      const size_t global3 = params.ny * params.nx;
+      const size_t local = params.nx;
       if (err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not set kernel arguments", err);
 
     for (ii = 0; ii < params.max_iters; ii++)
     {
-      //accelerate_flow(params,accel_area,cells,obstacles);
-      //propagate(params,cells,tmp_cells);
 
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not write to buffer",err);
@@ -136,26 +139,29 @@ int main(int argc, char* argv[])
 
       err = clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_flow,1,NULL,&global2,NULL,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,k_propagate,2,NULL,global,NULL,0, NULL, NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_propagate,2,NULL,global,NULL,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,kernel,2,NULL,global,NULL,0, NULL, NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_rebound,2,NULL,global,NULL,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,k_collision,2,NULL,global,NULL,0, NULL, NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,NULL,0, NULL, NULL);
+
+      //      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&global3,NULL,0,NULL,NULL);
 
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not run kernel",err);
 
 
+      double * results;
       // Read from kernel buffers
-      err = clEnqueueReadBuffer(lbm_context.queue, d_cells, CL_TRUE, 0, 
-				sizeof(speed_t)*(params.nx*params.ny),cells,0,NULL,NULL);
-      
+      //      err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
+      //			sizeof(speed_t)*(params.nx*params.ny),results,0,NULL,NULL);
+      av_vels[ii]=results[0];
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not read buffer", err);
 
       //rebound(params, cells, tmp_cells, obstacles);
       //collision(params,cells,tmp_cells,obstacles);
-        av_vels[ii] = av_velocity(params, cells, obstacles);
+      //av_vels[ii] = av_velocity(params, cells, obstacles);
 
         #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
@@ -183,7 +189,7 @@ int main(int argc, char* argv[])
 
     write_values(final_state_file, av_vels_file, params, cells, obstacles, av_vels);
     finalise(&cells, &tmp_cells, &obstacles, &av_vels);
-    opencl_finalise(lbm_context, &d_cells, &d_tmp_cells, &d_obstacles);
+    opencl_finalise(lbm_context);
 
     return EXIT_SUCCESS;
 }

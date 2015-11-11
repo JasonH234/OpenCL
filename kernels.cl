@@ -220,45 +220,73 @@ __kernel void collision(const param_t params, __global speed_t* cells,
 }
 
 
-__kernel void av_velocity(const param_t params, __global speed_t * cells, __global int* obstacles)
+double get_velocity(const int ii, __global speed_t * cells)
 {
-	int ii = get_global_id(0);
-	int jj = get_global_id(1);
 	int kk = 0;
-	double tot_u;
 	double local_density;
 	double u_x;
 	double u_y;
 
-	tot_u = 0.0;
-
-	if(!obstacles[ii*params.nx+jj])
-	{
 		local_density = 0.0;
 		
 		for (kk = 0; kk < NSPEEDS; kk++)
                 {
-                    local_density += cells[ii*params.nx + jj].speeds[kk];
+                    local_density += cells[ii].speeds[kk];
                 }
-		/* x-component of velocity */
-                u_x = (cells[ii*params.nx + jj].speeds[1] +
-                        cells[ii*params.nx + jj].speeds[5] +
-                        cells[ii*params.nx + jj].speeds[8]
-                    - (cells[ii*params.nx + jj].speeds[3] +
-                        cells[ii*params.nx + jj].speeds[6] +
-                        cells[ii*params.nx + jj].speeds[7])) /
+
+                u_x = (cells[ii].speeds[1] +
+                        cells[ii].speeds[5] +
+                        cells[ii].speeds[8]
+                    - (cells[ii].speeds[3] +
+                        cells[ii].speeds[6] +
+                        cells[ii].speeds[7])) /
                     local_density;
-		    /* compute y velocity component */
-                u_y = (cells[ii*params.nx + jj].speeds[2] +
-                        cells[ii*params.nx + jj].speeds[5] +
-                        cells[ii*params.nx + jj].speeds[6]
-                    - (cells[ii*params.nx + jj].speeds[4] +
-                        cells[ii*params.nx + jj].speeds[7] +
-                        cells[ii*params.nx + jj].speeds[8])) /
+
+                u_y = (cells[ii].speeds[2] +
+                        cells[ii].speeds[5] +
+                        cells[ii].speeds[6]
+                    - (cells[ii].speeds[4] +
+                        cells[ii].speeds[7] +
+                        cells[ii].speeds[8])) /
                     local_density;
-		     /* accumulate the norm of x- and y- velocity components */
-                //tot_u += sqrt(u_x*u_x + u_y*u_y);
-                /* increase counter of inspected cells */
-                //++tot_cells;
+
+                return sqrt(u_x*u_x + u_y*u_y);
+}
+
+__kernel void av_velocity(const param_t params, __global speed_t * cells, __global int* obstacles)
+//	      			 __local double* scratch, __global double* results)
+{
+	int ii = get_global_id(0);
+
+	//Initialise accumalator to zero
+	double acc = 0;
+
+	/*while (ii < params.ny*params.nx)
+	{
+		if(!obstacles[ii])
+		{
+			acc += get_velocity(ii, cells);
+		}
+		ii += get_global_size(0);
 	}
+	*/
+	/*int local_index = get_local_id(0);
+	
+
+	//scratch[local_index] = cells[ii] + cells[ii+get_global_size(0)];
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	int offset = get_local_size(0)/2;
+	for(;offset>1;offset/=2)
+	{
+		if(local_index < offset)
+		{
+	//		scratch[local_index] += scratch[local_index+offset];
+		}
+		barrier(CLK_LOCAL_MEM_FENCE);
+	}
+	if(local_index==0)
+	{
+		results[get_group_id(0)] = scratch[0];
+	}*/
 }

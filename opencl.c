@@ -143,10 +143,8 @@ void list_opencl_platforms(void)
 }
 
 void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
-		       lbm_context_t * lbm_context, cl_kernel * kernel, 
-		       cl_kernel * k_propagate, cl_kernel * k_collision, cl_kernel * k_av_vel,
-		       speed_t * cells, speed_t * tmp_cells,
-		       int * obstacles, cl_mem * d_cells, cl_mem * d_tmp_cells, cl_mem * d_obstacles)
+		       lbm_context_t * lbm_context,speed_t * cells, speed_t * tmp_cells,
+		       int * obstacles)
 {
     /* get device etc. */
     cl_platform_id * platforms = NULL;
@@ -262,65 +260,72 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, when trying to create the kernel.", err);
     //Create kernels
-    *kernel = clCreateKernel(program, "rebound", &err);
+    lbm_context->k_propagate = clCreateKernel(program, "propagate", &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, when trying to create the kernel.", err);
-    *k_propagate = clCreateKernel(program, "propagate", &err);
+    lbm_context->k_rebound = clCreateKernel(program, "rebound", &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, when trying to create collision kernel", err);
-    *k_collision = clCreateKernel(program, "collision", &err);
+    lbm_context->k_collision = clCreateKernel(program, "collision", &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, when trying to create collision kernel", err);
-    //*k_av_vel = clCreateKernel(program, "av_velocity", &err);
+    lbm_context->k_velocity = clCreateKernel(program, "av_velocity", &err);
     if(err != CL_SUCCESS)
-      DIE("OpenCL error %d, when trying to create collision kernel", err);
+      DIE("OpenCL error %d, when trying to create velocity kernel", err);
 
 
     //Allocate device memory
 
     //Allocate cells
-    *d_cells = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
+    lbm_context->d_cells = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
 			      sizeof(speed_t)*(params.nx*params.ny), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for cells", err);
     
     //Write cells to device
-    err = clEnqueueWriteBuffer(lbm_context->queue, *d_cells, CL_FALSE, 0,
+    err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_cells, CL_FALSE, 0,
 			       sizeof(speed_t)*(params.nx*params.ny), cells, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write cells to device", err);
 
     // Allocate tmp cells
-    *d_tmp_cells = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
+    lbm_context->d_tmp_cells = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
 			     sizeof(speed_t)*(params.nx*params.ny), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for tmp cells", err);
     
     //Write tmp cells to device
-    err = clEnqueueWriteBuffer(lbm_context->queue, *d_tmp_cells, CL_FALSE, 0,
+    err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_tmp_cells, CL_FALSE, 0,
 			       sizeof(speed_t)*(params.nx*params.ny), tmp_cells, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write tmp cells to device", err);
     
     // Allocate obstacles
-    *d_obstacles = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
+    lbm_context->d_obstacles = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
 				  sizeof(int)*(params.nx*params.ny), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for obstacles", err);
     
     //Write obstacles to device
-    err = clEnqueueWriteBuffer(lbm_context->queue, *d_obstacles, CL_FALSE, 0, 
+    err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_obstacles, CL_FALSE, 0, 
 			       sizeof(int)*(params.nx*params.ny), obstacles, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write obstacles to device", err);
+
+    // Allocate results
+    lbm_context->d_results = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
+				  sizeof(double)*(params.nx*params.ny), NULL, &err);
+    if(err != CL_SUCCESS)
+      DIE("OpenCL error %d, could not allocate memory for results", err);
 }
 
-void opencl_finalise(lbm_context_t lbm_context, cl_mem *d_cells, cl_mem *d_tmp_cells, cl_mem *d_obstacles)
+void opencl_finalise(lbm_context_t lbm_context)
 {
     clReleaseCommandQueue(lbm_context.queue);
     clReleaseContext(lbm_context.context);
-    clReleaseMemObject(*d_cells);
-    clReleaseMemObject(*d_tmp_cells);
-    clReleaseMemObject(*d_obstacles);
+    clReleaseMemObject(lbm_context.d_cells);
+    clReleaseMemObject(lbm_context.d_tmp_cells);
+    clReleaseMemObject(lbm_context.d_obstacles);
+    clReleaseMemObject(lbm_context.d_results);
 }
 
