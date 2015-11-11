@@ -118,8 +118,8 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_velocity, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_velocity, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_velocity, 2, sizeof(cl_mem), &lbm_context.d_obstacles);
-      //err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(double)*params.nx*params.ny,NULL);
-      //err |= clSetKernelArg(lbm_context.k_velocity, 4, sizeof(cl_mem), &lbm_context.d_results);
+      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(cl_double)*params.nx,NULL);
+      err |= clSetKernelArg(lbm_context.k_velocity, 4, sizeof(cl_mem), &lbm_context.d_results);
      
 
       //Run kernel with auto work group sizes
@@ -145,17 +145,19 @@ int main(int argc, char* argv[])
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,NULL,0, NULL, NULL);
 
-      //      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&global3,NULL,0,NULL,NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&global3,&local,0,NULL,NULL);
 
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not run kernel",err);
 
 
-      double * results;
+      double * results = malloc(sizeof(double)*params.nx*params.ny);
       // Read from kernel buffers
-      //      err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
-      //			sizeof(speed_t)*(params.nx*params.ny),results,0,NULL,NULL);
-      av_vels[ii]=results[0];
+      //err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_cells, CL_TRUE, 0, 
+      //		sizeof(speed_t)*(params.nx*params.ny),cells,0,NULL,NULL);
+      	    err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
+      		sizeof(double)*(params.nx*params.ny),results,0,NULL,NULL);
+	    //av_vels[ii] = results[0];
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not read buffer", err);
 
@@ -167,7 +169,7 @@ int main(int argc, char* argv[])
         printf("==timestep: %d==\n", ii);
         printf("av velocity: %.12E\n", av_vels[ii]);
         printf("tot density: %.12E\n", total_density(params, cells));
-        #endif
+	#endif
     }
 
     // Do not remove this, or the timing will be incorrect!
