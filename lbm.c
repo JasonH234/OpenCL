@@ -118,17 +118,32 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_velocity, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_velocity, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_velocity, 2, sizeof(cl_mem), &lbm_context.d_obstacles);
-      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(cl_double)*params.nx,NULL);
+      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(cl_double)*LOCALSIZE,NULL);
       err |= clSetKernelArg(lbm_context.k_velocity, 4, sizeof(cl_mem), &lbm_context.d_results);
      
 
       //Run kernel with auto work group sizes
       const size_t global[2] = {params.ny, params.nx};
       const size_t global2 = (accel_area.col_or_row == ACCEL_COLUMN) ? params.ny : params.nx;
-      const size_t global3 = params.ny * params.nx;
-      const size_t local = params.nx;
+
+
+      const int GLOBALSIZE = params.nx * params.ny;
+      //const size_t LOCALSIZE = GLOBALSIZE/32;
+      const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
+      const size_t g = GLOBALSIZE;
+      const size_t l = LOCALSIZE;
+
       if (err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not set kernel arguments", err);
+      int tot_cells = 0;
+      for (ii = 0; ii < params.ny; ii++)
+	{
+	  for(int jj = 0; jj < params.nx; jj++)
+	    {
+	      if(!obstacles[ii*params.nx + jj])
+		tot_cells ++;
+	    }
+	}
 
     for (ii = 0; ii < params.max_iters; ii++)
     {
@@ -145,19 +160,25 @@ int main(int argc, char* argv[])
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,NULL,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&global3,&local,0,NULL,NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&g,&l,0,NULL,NULL);
 
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not run kernel",err);
 
-
-      double * results = malloc(sizeof(double)*params.nx*params.ny);
+      double * results = (double*) malloc(sizeof(double)*(GROUPSIZE));
       // Read from kernel buffers
       //err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_cells, CL_TRUE, 0, 
       //		sizeof(speed_t)*(params.nx*params.ny),cells,0,NULL,NULL);
       	    err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
-      		sizeof(double)*(params.nx*params.ny),results,0,NULL,NULL);
-	    //av_vels[ii] = results[0];
+				      sizeof(double)*(GROUPSIZE),results,0,NULL,NULL);
+	    for(int x = 0; x < (GROUPSIZE); x ++)
+	      {
+		//		printf("results: %.12E\n", results[x]);
+		av_vels[ii]+=results[x];
+	      }
+	    av_vels[ii] = av_vels[ii]/ (double) tot_cells;
+
+	    free(results);
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not read buffer", err);
 
@@ -165,12 +186,16 @@ int main(int argc, char* argv[])
       //collision(params,cells,tmp_cells,obstacles);
       //av_vels[ii] = av_velocity(params, cells, obstacles);
 
-        #ifdef DEBUG
+       #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
         printf("av velocity: %.12E\n", av_vels[ii]);
         printf("tot density: %.12E\n", total_density(params, cells));
-	#endif
+		#endif
     }
+
+    err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_cells, CL_TRUE, 0, 
+      		sizeof(speed_t)*(params.nx*params.ny),cells,0,NULL,NULL);
+      	
 
     // Do not remove this, or the timing will be incorrect!
     clFinish(lbm_context.queue);
@@ -184,7 +209,7 @@ int main(int argc, char* argv[])
     systim=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
     printf("==done==\n");
-    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,cells,obstacles));
+    printf("Reynolds number:\t\t%.12E\n", calc_reynolds(params,av_vels[params.max_iters-1]));
     printf("Elapsed time:\t\t\t%.6f (s)\n", toc-tic);
     printf("Elapsed user CPU time:\t\t%.6f (s)\n", usrtim);
     printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
@@ -282,11 +307,11 @@ void write_values(const char * final_state_file, const char * av_vels_file,
     fclose(fp);
 }
 
-double calc_reynolds(const param_t params, speed_t* cells, int* obstacles)
+double calc_reynolds(const param_t params, double av_vel)
 {
     const double viscosity = 1.0 / 6.0 * (2.0 / params.omega - 1.0);
 
-    return av_velocity(params,cells,obstacles) * params.reynolds_dim / viscosity;
+    return av_vel * params.reynolds_dim / viscosity;
 }
 
 double total_density(const param_t params, speed_t* cells)

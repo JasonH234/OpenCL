@@ -227,8 +227,7 @@ double get_velocity(const speed_t cell)
 	double u_x;
 	double u_y;
 
-		local_density = 0.0;
-		
+	local_density = 0.0;
 		for (kk = 0; kk < NSPEEDS; kk++)
                 {
                     local_density += cell.speeds[kk];
@@ -256,36 +255,35 @@ double get_velocity(const speed_t cell)
 __kernel void av_velocity(const param_t params, __global speed_t * cells, __global int* obstacles,
 	      			 __local double* scratch, __global double* results)
 {
-	int ii = get_global_id(0);
+	int global_id = get_global_id(0);
+        int local_id = get_local_id(0);
+	int global_size = get_global_size(0);
+	int local_size = get_local_size(0);
 
-	//Initialise accumalator to zero
-	double acc = 0;
-
-	/*while (ii < params.ny*params.nx)
+ 
+	if(global_id < params.nx * params.ny)
 	{
-		if(!obstacles[ii])
-		{
-			acc += get_velocity(ii, cells);
-		}
-		ii += get_global_size(0);
+		if(!obstacles[global_id])
+			scratch[local_id] = get_velocity(cells[global_id]);
+		else
+			scratch[local_id] = 0;
 	}
-	*/
-        int local_index = get_local_id(0);
-	
-
-	scratch[local_index] = get_velocity(cells[ii]) + get_velocity(cells[ii+get_global_size(0)]);
+	else 
+	{
+		scratch[local_id] = 0;
+	}
 	barrier(CLK_LOCAL_MEM_FENCE);
-
-	int offset = get_local_size(0)/2;
-	for(;offset>1;offset/=2)
+	
+	for(int offset = 1; offset < local_size; offset <<= 1) 
 	{
-		if(local_index < offset)
+		int mask = (offset << 1) - 1;
+		if((local_id & mask) == 0)
 		{
-			scratch[local_index] += scratch[local_index+offset];
+			scratch[local_id] = scratch[local_id] + scratch[local_id+offset];
 		}
-		barrier(CLK_LOCAL_MEM_FENCE);
+		barrier (CLK_LOCAL_MEM_FENCE);
 	}
-	if(local_index==0)
+	if(local_id == 0)
 	{
 		results[get_group_id(0)] = scratch[0];
 	}

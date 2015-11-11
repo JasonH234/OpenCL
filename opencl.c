@@ -312,17 +312,38 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write obstacles to device", err);
 
+
+
+    const int GLOBALSIZE = params.nx * params.ny;
+    const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
+
     // Allocate results
     lbm_context->d_results = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
-				  sizeof(double)*(params.nx*params.ny), NULL, &err);
+				  sizeof(double)*(GROUPSIZE), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for results", err);
+    double * results = (double*) malloc(sizeof(double)*(GROUPSIZE));
+    //initialise empty
+    for(int i = 0; i<GROUPSIZE; i++)
+      results[i] = 0;
+    //Write results
+    err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_results, CL_FALSE, 0, 
+			       sizeof(double)*(GROUPSIZE), results, 0, NULL, NULL);
+    if(err != CL_SUCCESS)
+      DIE("OpenCL error %d, could not write results to device", err);
+    free(results);
+
 }
 
 void opencl_finalise(lbm_context_t lbm_context)
 {
     clReleaseCommandQueue(lbm_context.queue);
     clReleaseContext(lbm_context.context);
+    clReleaseKernel(lbm_context.k_flow);
+    clReleaseKernel(lbm_context.k_propagate);
+    clReleaseKernel(lbm_context.k_rebound);
+    clReleaseKernel(lbm_context.k_collision);
+    clReleaseKernel(lbm_context.k_velocity);
     clReleaseMemObject(lbm_context.d_cells);
     clReleaseMemObject(lbm_context.d_tmp_cells);
     clReleaseMemObject(lbm_context.d_obstacles);
