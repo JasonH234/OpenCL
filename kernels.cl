@@ -37,18 +37,18 @@ __kernel void accelerate_flow(const param_t params, const accel_area_t accel_are
 		/* if the cell is not occupied and
             ** we don't send a density negative */
             if (!obstacles[ii*params.nx + jj] &&
-            (cells[ii*params.nx + jj*5] - w1) > 0.0 &&
-            (cells[ii*params.nx + jj*8] - w2) > 0.0 &&
-            (cells[ii*params.nx + jj*9] - w2) > 0.0 )
+            (cells[ii*params.nx + jj+4*(params.nx*params.ny)] - w1) > 0.0 &&
+            (cells[ii*params.nx + jj+7*(params.nx*params.ny)] - w2) > 0.0 &&
+            (cells[ii*params.nx + jj+8*(params.nx*params.ny)] - w2) > 0.0 )
             {
 	    /* increase 'north-side' densities */
-                cells[ii*params.nx + jj*3] += w1;
-                cells[ii*params.nx + jj*6] += w2;
-                cells[ii*params.nx + jj*7] += w2;
+                cells[ii*params.nx + jj+2*(params.nx*params.ny)] += w1;
+                cells[ii*params.nx + jj+5*(params.nx*params.ny)] += w2;
+                cells[ii*params.nx + jj+6*(params.nx*params.ny)] += w2;
 		/* decrease 'south-side' densities */
-                cells[ii*params.nx + jj*5] -= w1;
-                cells[ii*params.nx + jj*8] -= w2;
-                cells[ii*params.nx + jj*9] -= w2;
+                cells[ii*params.nx + jj+4*(params.nx*params.ny)] -= w1;
+                cells[ii*params.nx + jj+7*(params.nx*params.ny)] -= w2;
+                cells[ii*params.nx + jj+8*(params.nx*params.ny)] -= w2;
 		}
 	}
 	else
@@ -59,18 +59,18 @@ __kernel void accelerate_flow(const param_t params, const accel_area_t accel_are
 	/* if the cell is not occupied and
             ** we don't send a density negative */
             if (!obstacles[ii*params.nx + jj] &&
-	     (cells[ii*params.nx + jj*4] - w1) > 0.0 &&
-            (cells[ii*params.nx + jj*7] - w2) > 0.0 &&
-            (cells[ii*params.nx + jj*8] - w2) > 0.0 )
+	     (cells[ii*params.nx + jj+3*(params.nx*params.ny)] - w1) > 0.0 &&
+            (cells[ii*params.nx + jj+6*(params.nx*params.ny)] - w2) > 0.0 &&
+            (cells[ii*params.nx + jj+7*(params.nx*params.ny)] - w2) > 0.0 )
             {
 	    /* increase 'east-side' densities */
-                cells[ii*params.nx + jj*2] += w1;
-                cells[ii*params.nx + jj*6] += w2;
-                cells[ii*params.nx + jj*9] += w2;
+                cells[ii*params.nx + jj+(params.nx*params.ny)] += w1;
+                cells[ii*params.nx + jj+5*(params.nx*params.ny)] += w2;
+                cells[ii*params.nx + jj+8*(params.nx*params.ny)] += w2;
 		/* decrease 'west-side' densities */
-                cells[ii*params.nx + jj*4] -= w1;
-                cells[ii*params.nx + jj*7] -= w2;
-                cells[ii*params.nx + jj*8] -= w2;
+                cells[ii*params.nx + jj+3*(params.nx*params.ny)] -= w1;
+                cells[ii*params.nx + jj+6*(params.nx*params.ny)] -= w2;
+                cells[ii*params.nx + jj+7*(params.nx*params.ny)] -= w2;
 		}
 	}
 }
@@ -89,14 +89,14 @@ __kernel void propagate(const param_t params, __global float* cells, __global fl
 
 	    tmp_cells[ii *params.nx + jj]  = cells[ii*params.nx + jj]; /* central cell, */
                                                      /* no movement   */
-            tmp_cells[ii *params.nx + x_e] = cells[ii*params.nx + jj*2]; /* east */
-            tmp_cells[y_n*params.nx + jj*2]  = cells[ii*params.nx + jj*3]; /* north */
-            tmp_cells[ii *params.nx + x_w*3] = cells[ii*params.nx + jj*4]; /* west */
-            tmp_cells[y_s*params.nx + jj*4]  = cells[ii*params.nx + jj*5]; /* south */
-	    tmp_cells[y_n*params.nx + x_e*6] = cells[ii*params.nx + jj*6]; /* north-east */
-            tmp_cells[y_n*params.nx + x_w*7] = cells[ii*params.nx + jj*7]; /* north-west */
-            tmp_cells[y_s*params.nx + x_w*8] = cells[ii*params.nx + jj*8]; /* south-west */
-            tmp_cells[y_s*params.nx + x_e*9] = cells[ii*params.nx + jj*9]; /* south-east */
+            tmp_cells[ii *params.nx + x_e+(params.nx*params.ny)] = cells[ii*params.nx + jj+(params.nx*params.ny)]; /* east */
+            tmp_cells[y_n*params.nx + jj+2*(params.nx*params.ny)]  = cells[ii*params.nx + jj+2*(params.nx*params.ny)]; /* north */
+            tmp_cells[ii *params.nx + x_w+3*(params.nx*params.ny)] = cells[ii*params.nx + jj+3*(params.nx*params.ny)]; /* west */
+            tmp_cells[y_s*params.nx + jj+4*(params.nx*params.ny)]  = cells[ii*params.nx + jj+4*(params.nx*params.ny)]; /* south */
+	    tmp_cells[y_n*params.nx + x_e+5*(params.nx*params.ny)] = cells[ii*params.nx + jj+5*(params.nx*params.ny)]; /* north-east */
+            tmp_cells[y_n*params.nx + x_w+6*(params.nx*params.ny)] = cells[ii*params.nx + jj+6*(params.nx*params.ny)]; /* north-west */
+            tmp_cells[y_s*params.nx + x_w+7*(params.nx*params.ny)] = cells[ii*params.nx + jj+7*(params.nx*params.ny)]; /* south-west */
+            tmp_cells[y_s*params.nx + x_e+8*(params.nx*params.ny)] = cells[ii*params.nx + jj+8*(params.nx*params.ny)]; /* south-east */
 
 }
 
@@ -108,14 +108,14 @@ __kernel void rebound(const param_t params, __global float* cells,
 
 	if(obstacles[ii*params.nx + jj])
 	{
-		cells[ii*params.nx+jj*2] = tmp_cells[ii*params.nx+jj*4]; 
-		cells[ii*params.nx+jj*3] = tmp_cells[ii*params.nx+jj*5]; 
-		cells[ii*params.nx+jj*4] = tmp_cells[ii*params.nx+jj*2]; 
-		cells[ii*params.nx+jj*5] = tmp_cells[ii*params.nx+jj*3]; 
-		cells[ii*params.nx+jj*6] = tmp_cells[ii*params.nx+jj*8]; 
-		cells[ii*params.nx+jj*7] = tmp_cells[ii*params.nx+jj*9]; 
-		cells[ii*params.nx+jj*8] = tmp_cells[ii*params.nx+jj*6]; 
-		cells[ii*params.nx+jj*9] = tmp_cells[ii*params.nx+jj*7]; 
+		cells[ii*params.nx+jj+(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+3*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+2*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+4*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+3*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+4*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+2*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+5*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+7*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+6*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+8*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+7*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+5*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+8*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+6*(params.nx*params.ny)]; 
 	}
 }
 
@@ -138,43 +138,41 @@ __kernel void collision(const param_t params, __global float* cells,
 
 	if(obstacles[ii*params.nx + jj])
 	{
-		cells[ii*params.nx+jj*2] = tmp_cells[ii*params.nx+jj*4]; 
-		cells[ii*params.nx+jj*3] = tmp_cells[ii*params.nx+jj*5]; 
-		cells[ii*params.nx+jj*4] = tmp_cells[ii*params.nx+jj*2]; 
-		cells[ii*params.nx+jj*5] = tmp_cells[ii*params.nx+jj*3]; 
-		cells[ii*params.nx+jj*6] = tmp_cells[ii*params.nx+jj*8]; 
-		cells[ii*params.nx+jj*7] = tmp_cells[ii*params.nx+jj*9]; 
-		cells[ii*params.nx+jj*8] = tmp_cells[ii*params.nx+jj*6]; 
-		cells[ii*params.nx+jj*9] = tmp_cells[ii*params.nx+jj*7]; 
+		cells[ii*params.nx+jj+(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+3*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+2*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+4*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+3*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+4*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+2*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+5*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+7*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+6*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+8*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+7*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+5*(params.nx*params.ny)]; 
+		cells[ii*params.nx+jj+8*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+6*(params.nx*params.ny)]; 
 	}
 	if(!obstacles[ii*params.nx +jj])
 	{
 		local_density = 0.0;
-		for (kk = 0; kk < NSPEEDS; kk++)
+
+                for (kk = 0; kk < NSPEEDS; kk++)
                 {
-                    local_density += tmp_cells[ii*params.nx + jj*(kk+1)];
+                    local_density += tmp_cells[ii*params.nx + jj+kk*(params.nx*params.ny)];
                 }
 
-                /* compute x velocity component */
-                u_x = (tmp_cells[ii*params.nx + jj*2] +
-                        tmp_cells[ii*params.nx + jj*6] +
-                        tmp_cells[ii*params.nx + jj*9]
-                    - (tmp_cells[ii*params.nx + jj*4] +
-                        tmp_cells[ii*params.nx + jj*7] +
-                        tmp_cells[ii*params.nx + jj*8]))
+		u_x = (tmp_cells[ii*params.nx + jj+(params.nx*params.ny)] +
+                        tmp_cells[ii*params.nx + jj+5*(params.nx*params.ny)] +
+                        tmp_cells[ii*params.nx + jj+8*(params.nx*params.ny)]
+                    - (tmp_cells[ii*params.nx + jj+3*(params.nx*params.ny)] +
+                        tmp_cells[ii*params.nx + jj+6*(params.nx*params.ny)] +
+                        tmp_cells[ii*params.nx + jj+7*(params.nx*params.ny)]))
                     / local_density;
 
-                /* compute y velocity component */
-                u_y = (tmp_cells[ii*params.nx + jj*3] +
-                        tmp_cells[ii*params.nx + jj*6] +
-                        tmp_cells[ii*params.nx + jj*7]
-                    - (tmp_cells[ii*params.nx + jj*5] +
-                        tmp_cells[ii*params.nx + jj*8] +
-                        tmp_cells[ii*params.nx + jj*9]))
+		    u_y = (tmp_cells[ii*params.nx + jj+2*(params.nx*params.ny)] +
+                        tmp_cells[ii*params.nx + jj+5*(params.nx*params.ny)] +
+                        tmp_cells[ii*params.nx + jj+6*(params.nx*params.ny)]
+                    - (tmp_cells[ii*params.nx + jj+4*(params.nx*params.ny)] +
+                        tmp_cells[ii*params.nx + jj+7*(params.nx*params.ny)] +
+                        tmp_cells[ii*params.nx + jj+8*(params.nx*params.ny)]))
                     / local_density;
 
-                /* velocity squared */
-                u_sq = u_x * u_x + u_y * u_y;
+		    u_sq = u_x * u_x + u_y * u_y;
 
                 /* directional velocity components */
                 u[1] =   u_x;        /* east */
@@ -186,9 +184,7 @@ __kernel void collision(const param_t params, __global float* cells,
                 u[7] = - u_x - u_y;  /* south-west */
                 u[8] =   u_x - u_y;  /* south-east */
 
-		/* equilibrium densities */
-                /* zero velocity density: weight w0 */
-                d_equ[0] = w0 * local_density * (1.0 - u_sq / (2.0 * c_sq));
+ 		d_equ[0] = w0 * local_density * (1.0 - u_sq / (2.0 * c_sq));
                 /* axis speeds: weight w1 */
                 d_equ[1] = w1 * local_density * (1.0 + u[1] / c_sq
                     + (u[1] * u[1]) / (2.0 * c_sq * c_sq)
@@ -216,28 +212,31 @@ __kernel void collision(const param_t params, __global float* cells,
                     + (u[8] * u[8]) / (2.0 * c_sq * c_sq)
                     - u_sq / (2.0 * c_sq));
 
-		    /* relaxation step */
-        	    for (kk = 0; kk < NSPEEDS; kk++)
-           	     {
-			cells[ii*params.nx + jj*(kk+1)] =
-              	       (tmp_cells[ii*params.nx + jj*(kk+1)] + params.omega *
-             		      (d_equ[kk] - tmp_cells[ii*params.nx + jj*(kk+1)]));
-              }
-       }
+ 		    /* relaxation step */
+                for (kk = 0; kk < NSPEEDS; kk++)
+                {
+                    cells[ii*params.nx + jj+kk*(params.nx*params.ny)] = 
+                        (tmp_cells[ii*params.nx + jj+kk*(params.nx*params.ny)] + params.omega * 
+                        (d_equ[kk] - tmp_cells[ii*params.nx + jj+kk*(params.nx*params.ny)]));
+                }
+
+        }
 }
 
 __kernel void av_velocity(const param_t params, __global float * cells, __global int* obstacles,
 	      			 __local float* scratch, __global float* results)
 {
 	int global_id = get_global_id(0);
-        int local_id = get_local_id(0);
+	int ii = get_global_id(0);
+	int jj = get_global_id(1);
+        int local_idy = get_local_id(0);
+	int local_idx = get_local_id(1);
 	int global_size = get_global_size(0);
-	int local_size = get_local_size(0);
+	int local_size = get_local_size(0)+get_local_size(1);
 
- 
-	if(global_id < params.nx * params.ny)
+	if(jj < params.nx && ii < params.ny)
 	{
-		if(!obstacles[global_id])
+		if(!obstacles[ii*params.nx+jj])
 		{
 		int kk = 0;
 		float local_density;
@@ -247,48 +246,48 @@ __kernel void av_velocity(const param_t params, __global float * cells, __global
 		local_density = 0.0;
 		for (kk = 0; kk < NSPEEDS; kk++)
                 {
-                    local_density += cells[global_id+kk];
-                }
-
-                u_x = (cells[global_id+1] +
-                        cells[global_id+5] +
-                        cells[global_id+8]
-                    - (cells[global_id+3] +
-                        cells[global_id+6] +
-                        cells[global_id+7])) /
+                    local_density += cells[ii*params.nx+jj+kk*(params.nx*params.ny)];
+              	}
+		
+                u_x = (cells[ii*params.nx+jj+(params.nx*params.ny)] +
+                        cells[ii*params.nx+jj+5*(params.nx*params.ny)] +
+                        cells[ii*params.nx+jj+8*(params.nx*params.ny)]
+                    - (cells[ii*params.nx+jj+3*(params.nx*params.ny)] +
+                        cells[ii*params.nx+jj+6*(params.nx*params.ny)] +
+                        cells[ii*params.nx+jj+7*(params.nx*params.ny)])) /
                     local_density;
 
-                u_y = (cells[global_id+2] +
-                        cells[global_id+5] +
-                        cells[global_id+6]
-                    - (cells[global_id+4] +
-                        cells[global_id+7] +
-                        cells[global_id+8])) /
+                u_y = (cells[ii*params.nx+jj+2*(params.nx*params.ny)] +
+                        cells[ii*params.nx+jj+5*(params.nx*params.ny)] +
+                        cells[ii*params.nx+jj+6*(params.nx*params.ny)]
+                    - (cells[ii*params.nx+jj+4*(params.nx*params.ny)] +
+                        cells[ii*params.nx+jj+7*(params.nx*params.ny)] +
+                        cells[ii*params.nx+jj+8*(params.nx*params.ny)])) /
                     local_density;
 
-                scratch[local_id] = sqrt(u_x*u_x + u_y*u_y);
+                scratch[local_idy*params.nx+local_idx] = sqrt(u_x*u_x + u_y*u_y);
 		}
 		else
 		{
-			scratch[local_id] = 0;
+			scratch[local_idy*params.nx+local_idx] = 0;
 		}
 	}
 	else 
 	{
-		scratch[local_id] = 0;
+		scratch[local_idy*params.nx+local_idx] = 0;
 	}
 	barrier(CLK_LOCAL_MEM_FENCE);
 	
 	for(int offset = 1; offset < local_size; offset <<= 1) 
 	{
 		int mask = (offset << 1) - 1;
-		if((local_id & mask) == 0)
+		if((jj & mask) == 0)
 		{
-			scratch[local_id] = scratch[local_id] + scratch[local_id+offset];
+			scratch[local_idy*params.nx+local_idx] = scratch[local_idy*params.nx+local_idx] + scratch[local_idy*params.nx+local_idx+offset];
 		}
 		barrier (CLK_LOCAL_MEM_FENCE);
 	}
-	if(local_id == 0)
+	if(jj == 0)
 	{
 		results[get_group_id(0)] = scratch[0];
 	}

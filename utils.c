@@ -191,16 +191,16 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     fclose(fp);
 
     /* Allocate arrays */
-    *cells_ptr = (float*) malloc(sizeof(float)*(params->ny*params->nx*NSPEEDS));
+    *cells_ptr = (cl_float*) malloc(sizeof(cl_float)*(params->ny*params->nx*NSPEEDS));
     if (*cells_ptr == NULL) DIE("Cannot allocate memory for cells");
 
-    *tmp_cells_ptr = (float*) malloc(sizeof(float)*(params->ny*params->nx*NSPEEDS));
+    *tmp_cells_ptr = (cl_float*) malloc(sizeof(cl_float)*(params->ny*params->nx*NSPEEDS));
     if (*tmp_cells_ptr == NULL) DIE("Cannot allocate memory for tmp_cells");
 
     *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
     if (*obstacles_ptr == NULL) DIE("Cannot allocate memory for patches");
 
-    *av_vels_ptr = (float*) malloc(sizeof(float)*(params->max_iters));
+    *av_vels_ptr = (cl_float*) malloc(sizeof(cl_float)*(params->max_iters));
     if (*av_vels_ptr == NULL) DIE("Cannot allocate memory for av_vels");
 
     w0 = params->density * 4.0/9.0;
@@ -215,15 +215,15 @@ void initialise(const char* param_file, accel_area_t * accel_area,
             /* centre */
             (*cells_ptr)[ii*params->nx + jj] = w0;
             /* axis directions */
-            (*cells_ptr)[ii*params->nx + jj*2] = w1;
-            (*cells_ptr)[ii*params->nx + jj*3] = w1;
-            (*cells_ptr)[ii*params->nx + jj*4] = w1;
-            (*cells_ptr)[ii*params->nx + jj*5] = w1;
+            (*cells_ptr)[ii*params->nx + jj+params->nx*params->ny] = w1;
+            (*cells_ptr)[ii*params->nx + jj+2*(params->nx*params->ny)] = w1;
+            (*cells_ptr)[ii*params->nx + jj+3*(params->nx*params->ny)] = w1;
+            (*cells_ptr)[ii*params->nx + jj+4*(params->nx*params->ny)] = w1;
             /* diagonals */
-            (*cells_ptr)[ii*params->nx + jj*6] = w2;
-            (*cells_ptr)[ii*params->nx + jj*7] = w2;
-            (*cells_ptr)[ii*params->nx + jj*8] = w2;
-            (*cells_ptr)[ii*params->nx + jj*9] = w2;
+            (*cells_ptr)[ii*params->nx + jj+5*(params->nx*params->ny)] = w2;
+            (*cells_ptr)[ii*params->nx + jj+6*(params->nx*params->ny)] = w2;
+            (*cells_ptr)[ii*params->nx + jj+7*(params->nx*params->ny)] = w2;
+            (*cells_ptr)[ii*params->nx + jj+8*(params->nx*params->ny)] = w2;
 
             (*obstacles_ptr)[ii*params->nx + jj] = 0;
         }

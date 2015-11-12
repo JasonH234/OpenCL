@@ -8,7 +8,7 @@
 #endif
 
 #define NSPEEDS         9
-#define LOCALSIZE 8
+#define LOCALSIZE 1000
 
 /* Size of box in imaginary 'units */
 #define BOX_X_SIZE (100.0)

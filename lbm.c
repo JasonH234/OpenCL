@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
       const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
       const size_t g = GLOBALSIZE;
       const size_t l = LOCALSIZE;
-      const size_t local[2] = {1, params.nx};
+      const size_t local[2] = {1, LOCALSIZE};
 
 
     cl_int err;
@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_velocity, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_velocity, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_velocity, 2, sizeof(cl_mem), &lbm_context.d_obstacles);
-      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(float)*LOCALSIZE,NULL);
+      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(cl_float)*LOCALSIZE,NULL);
       err |= clSetKernelArg(lbm_context.k_velocity, 4, sizeof(cl_mem), &lbm_context.d_results);
      
       if (err != CL_SUCCESS)
@@ -159,25 +159,24 @@ int main(int argc, char* argv[])
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_propagate,2,NULL,global,local,0, NULL, NULL);
 
-      //err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_rebound,2,NULL,global,NULL,0, NULL, NULL);
-
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,local,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&g,&l,0,NULL,NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,2,NULL,global, local,0,NULL,NULL);
 
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not run kernel",err);
       
       cl_float * results = (cl_float*) malloc(sizeof(cl_float)*(GROUPSIZE));
       err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
-				      sizeof(float)*(GROUPSIZE),results,0,NULL,NULL);
+				      sizeof(cl_float)*(GROUPSIZE),results,0,NULL,NULL);
 
 	    if(err != CL_SUCCESS)
 	      DIE("OpenCL error %d, could not read buffer", err);
 
 	    for(int x = 0; x < (GROUPSIZE); x ++)
 	      {
-		//				printf("results: %.12E\n", results[x]);
+		//if(results[x] > 0 || results[x] < 0)
+		  //printf("results:[%d][%d], %.12E\n", ii, x, results[x]);
 		av_vels[ii]+=results[x];
 	      }
 	    av_vels[ii] = av_vels[ii]/ (float) tot_cells;
@@ -255,25 +254,25 @@ void write_values(const char * final_state_file, const char * av_vels_file,
 
                 for (kk = 0; kk < NSPEEDS; kk++)
                 {
-		  local_density += cells[ii*params.nx + jj*(kk+1)];
+		  local_density += cells[ii*params.nx + jj+kk*(params.nx*params.ny)];
                 }
 
                 /* compute x velocity component */
-                u_x = (cells[ii*params.nx + jj*2] +
-                        cells[ii*params.nx + jj*6] +
-                        cells[ii*params.nx + jj*9]
-                    - (cells[ii*params.nx + jj*4] +
-                        cells[ii*params.nx + jj*7] +
-                        cells[ii*params.nx + jj*8]))
+                u_x = (cells[ii*params.nx + jj+(params.nx*params.ny)] +
+                        cells[ii*params.nx + jj+5*(params.nx*params.ny)] +
+		       cells[ii*params.nx + jj+8*(params.nx*params.ny)]
+		       - (cells[ii*params.nx + jj+3*(params.nx*params.ny)] +
+			  cells[ii*params.nx + jj+6*(params.nx*params.ny)] +
+			  cells[ii*params.nx + jj+7*(params.nx*params.ny)]))
                     / local_density;
 
                 /* compute y velocity component */
-                u_y = (cells[ii*params.nx + jj*3] +
-                        cells[ii*params.nx + jj*6] +
-                        cells[ii*params.nx + jj*7]
-                    - (cells[ii*params.nx + jj*5] +
-                        cells[ii*params.nx + jj*8] +
-                        cells[ii*params.nx + jj*9]))
+                u_y = (cells[ii*params.nx + jj+2*(params.nx*params.ny)] +
+		       cells[ii*params.nx + jj+5*(params.nx*params.ny)] +
+		       cells[ii*params.nx + jj+6*(params.nx*params.ny)]
+		       - (cells[ii*params.nx + jj+4*(params.nx*params.ny)] +
+			  cells[ii*params.nx + jj+7*(params.nx*params.ny)] +
+			  cells[ii*params.nx + jj+8*(params.nx*params.ny)]))
                     / local_density;
 
                 /* compute norm of velocity */
