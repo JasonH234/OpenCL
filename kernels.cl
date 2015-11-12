@@ -226,70 +226,66 @@ __kernel void collision(const param_t params, __global float* cells,
 __kernel void av_velocity(const param_t params, __global float * cells, __global int* obstacles,
 	      			 __local float* scratch, __global float* results)
 {
-	int global_id = get_global_id(0);
-	int ii = get_global_id(0);
-	int jj = get_global_id(1);
-        int local_idy = get_local_id(0);
-	int local_idx = get_local_id(1);
-	int global_size = get_global_size(0);
-	int local_size = get_local_size(0)+get_local_size(1);
 
-	if(jj < params.nx && ii < params.ny)
+  int global_id = get_global_id(0);
+  int local_id = get_local_id(0);
+  int global_size = get_global_size(0);
+  int local_size = get_local_size(0);
+
+  if(global_id < params.nx * params.ny)
+    {
+      if(!obstacles[global_id])
 	{
-		if(!obstacles[ii*params.nx+jj])
-		{
-		int kk = 0;
-		float local_density;
-		float u_x;
-		float u_y;
+	int kk = 0;
 
-		local_density = 0.0;
-		for (kk = 0; kk < NSPEEDS; kk++)
+	float u_x, u_y;
+	float local_density = 0.0;
+
+                for (kk = 0; kk < NSPEEDS; kk++)
                 {
-                    local_density += cells[ii*params.nx+jj+kk*(params.nx*params.ny)];
-              	}
-		
-                u_x = (cells[ii*params.nx+jj+(params.nx*params.ny)] +
-                        cells[ii*params.nx+jj+5*(params.nx*params.ny)] +
-                        cells[ii*params.nx+jj+8*(params.nx*params.ny)]
-                    - (cells[ii*params.nx+jj+3*(params.nx*params.ny)] +
-                        cells[ii*params.nx+jj+6*(params.nx*params.ny)] +
-                        cells[ii*params.nx+jj+7*(params.nx*params.ny)])) /
-                    local_density;
+                    local_density += cells[global_id+kk*(params.nx*params.ny)];
+                }
 
-                u_y = (cells[ii*params.nx+jj+2*(params.nx*params.ny)] +
-                        cells[ii*params.nx+jj+5*(params.nx*params.ny)] +
-                        cells[ii*params.nx+jj+6*(params.nx*params.ny)]
-                    - (cells[ii*params.nx+jj+4*(params.nx*params.ny)] +
-                        cells[ii*params.nx+jj+7*(params.nx*params.ny)] +
-                        cells[ii*params.nx+jj+8*(params.nx*params.ny)])) /
-                    local_density;
+		u_x = (cells[global_id+(params.nx*params.ny)] +
+                        cells[global_id+5*(params.nx*params.ny)] +
+                        cells[global_id+8*(params.nx*params.ny)]
+                    - (cells[global_id+3*(params.nx*params.ny)] +
+                        cells[global_id+6*(params.nx*params.ny)] +
+                        cells[global_id+7*(params.nx*params.ny)]))
+                    / local_density;
 
-                scratch[local_idy*params.nx+local_idx] = sqrt(u_x*u_x + u_y*u_y);
-		}
-		else
-		{
-			scratch[local_idy*params.nx+local_idx] = 0;
-		}
-	}
-	else 
-	{
-		scratch[local_idy*params.nx+local_idx] = 0;
-	}
-	barrier(CLK_LOCAL_MEM_FENCE);
-	
-	for(int offset = 1; offset < local_size; offset <<= 1) 
-	{
-		int mask = (offset << 1) - 1;
-		if((jj & mask) == 0)
-		{
-			scratch[local_idy*params.nx+local_idx] = scratch[local_idy*params.nx+local_idx] + scratch[local_idy*params.nx+local_idx+offset];
-		}
-		barrier (CLK_LOCAL_MEM_FENCE);
-	}
-	if(jj == 0)
-	{
-		results[get_group_id(0)] = scratch[0];
-	}
+		    u_y = (cells[global_id+2*(params.nx*params.ny)] +
+                        cells[global_id+5*(params.nx*params.ny)] +
+                        cells[global_id+6*(params.nx*params.ny)]
+                    - (cells[global_id+4*(params.nx*params.ny)] +
+                        cells[global_id+7*(params.nx*params.ny)] +
+                        cells[global_id+8*(params.nx*params.ny)]))
+                    / local_density;
 
+	  scratch[local_id] = sqrt(u_x * u_x + u_y * u_y);
+	}
+      else
+	scratch[local_id] = 0;
+    }
+
+  else 
+    {
+      scratch[local_id] = 0;
+    }
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  for(int offset = 1; offset < local_size; offset <<= 1) 
+    {
+      int mask = (offset << 1) - 1;
+      if((local_id & mask) == 0)
+	{
+	  scratch[local_id] = scratch[local_id] + scratch[local_id+offset];
+	}
+      barrier (CLK_LOCAL_MEM_FENCE);
+    }
+
+  if(local_id == 0)
+    {
+      results[get_group_id(0)] = scratch[0];
+    }
 }

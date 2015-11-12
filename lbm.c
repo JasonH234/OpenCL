@@ -161,7 +161,7 @@ int main(int argc, char* argv[])
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,local,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,2,NULL,global, local,0,NULL,NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&g, &l,0,NULL,NULL);
 
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not run kernel",err);
