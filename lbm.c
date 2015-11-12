@@ -103,12 +103,12 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_propagate, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_propagate, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_propagate, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
-
+      /*
       err |= clSetKernelArg(lbm_context.k_rebound, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_rebound, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_rebound, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
       err |= clSetKernelArg(lbm_context.k_rebound, 3, sizeof(cl_mem), &lbm_context.d_obstacles);
-      
+*/      
       err |= clSetKernelArg(lbm_context.k_collision, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_collision, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_collision, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
@@ -156,7 +156,7 @@ int main(int argc, char* argv[])
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_propagate,2,NULL,global,NULL,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_rebound,2,NULL,global,NULL,0, NULL, NULL);
+      //err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_rebound,2,NULL,global,NULL,0, NULL, NULL);
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,NULL,0, NULL, NULL);
 
