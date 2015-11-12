@@ -2,11 +2,6 @@
 
 #define NSPEEDS 9
 
-/* struct to hold the 'speed' values */
-typedef struct {
-    float speeds[NSPEEDS];
-} speed_t;
-
 /* struct to hold the parameter values */
 typedef struct {
     int nx;            /* no. of cells in x-direction */
@@ -26,7 +21,7 @@ typedef struct {
 
 
 __kernel void accelerate_flow(const param_t params, const accel_area_t accel_area,
-    __global speed_t* cells, __global int* obstacles)
+    __global float* cells, __global int* obstacles)
 {
     int ii,jj;     /* generic counters */
     
@@ -42,18 +37,18 @@ __kernel void accelerate_flow(const param_t params, const accel_area_t accel_are
 		/* if the cell is not occupied and
             ** we don't send a density negative */
             if (!obstacles[ii*params.nx + jj] &&
-            (cells[ii*params.nx + jj].speeds[4] - w1) > 0.0 &&
-            (cells[ii*params.nx + jj].speeds[7] - w2) > 0.0 &&
-            (cells[ii*params.nx + jj].speeds[8] - w2) > 0.0 )
+            (cells[ii*params.nx + jj*5] - w1) > 0.0 &&
+            (cells[ii*params.nx + jj*8] - w2) > 0.0 &&
+            (cells[ii*params.nx + jj*9] - w2) > 0.0 )
             {
 	    /* increase 'north-side' densities */
-                cells[ii*params.nx + jj].speeds[2] += w1;
-                cells[ii*params.nx + jj].speeds[5] += w2;
-                cells[ii*params.nx + jj].speeds[6] += w2;
+                cells[ii*params.nx + jj*3] += w1;
+                cells[ii*params.nx + jj*6] += w2;
+                cells[ii*params.nx + jj*7] += w2;
 		/* decrease 'south-side' densities */
-                cells[ii*params.nx + jj].speeds[4] -= w1;
-                cells[ii*params.nx + jj].speeds[7] -= w2;
-                cells[ii*params.nx + jj].speeds[8] -= w2;
+                cells[ii*params.nx + jj*5] -= w1;
+                cells[ii*params.nx + jj*8] -= w2;
+                cells[ii*params.nx + jj*9] -= w2;
 		}
 	}
 	else
@@ -64,23 +59,23 @@ __kernel void accelerate_flow(const param_t params, const accel_area_t accel_are
 	/* if the cell is not occupied and
             ** we don't send a density negative */
             if (!obstacles[ii*params.nx + jj] &&
-	     (cells[ii*params.nx + jj].speeds[3] - w1) > 0.0 &&
-            (cells[ii*params.nx + jj].speeds[6] - w2) > 0.0 &&
-            (cells[ii*params.nx + jj].speeds[7] - w2) > 0.0 )
+	     (cells[ii*params.nx + jj*4] - w1) > 0.0 &&
+            (cells[ii*params.nx + jj*7] - w2) > 0.0 &&
+            (cells[ii*params.nx + jj*8] - w2) > 0.0 )
             {
 	    /* increase 'east-side' densities */
-                cells[ii*params.nx + jj].speeds[1] += w1;
-                cells[ii*params.nx + jj].speeds[5] += w2;
-                cells[ii*params.nx + jj].speeds[8] += w2;
+                cells[ii*params.nx + jj*2] += w1;
+                cells[ii*params.nx + jj*6] += w2;
+                cells[ii*params.nx + jj*9] += w2;
 		/* decrease 'west-side' densities */
-                cells[ii*params.nx + jj].speeds[3] -= w1;
-                cells[ii*params.nx + jj].speeds[6] -= w2;
-                cells[ii*params.nx + jj].speeds[7] -= w2;
+                cells[ii*params.nx + jj*4] -= w1;
+                cells[ii*params.nx + jj*7] -= w2;
+                cells[ii*params.nx + jj*8] -= w2;
 		}
 	}
 }
 
-__kernel void propagate(const param_t params, __global speed_t* cells, __global speed_t* tmp_cells)
+__kernel void propagate(const param_t params, __global float* cells, __global float* tmp_cells)
 {
 	int ii = get_global_id(0);
 	int jj = get_global_id(1);
@@ -92,40 +87,40 @@ __kernel void propagate(const param_t params, __global speed_t* cells, __global 
             y_s = (ii == 0) ? (ii + params.ny - 1) : (ii - 1);
             x_w = (jj == 0) ? (jj + params.nx - 1) : (jj - 1);
 
-	    tmp_cells[ii *params.nx + jj].speeds[0]  = cells[ii*params.nx + jj].speeds[0]; /* central cell, */
+	    tmp_cells[ii *params.nx + jj]  = cells[ii*params.nx + jj]; /* central cell, */
                                                      /* no movement   */
-            tmp_cells[ii *params.nx + x_e].speeds[1] = cells[ii*params.nx + jj].speeds[1]; /* east */
-            tmp_cells[y_n*params.nx + jj].speeds[2]  = cells[ii*params.nx + jj].speeds[2]; /* north */
-            tmp_cells[ii *params.nx + x_w].speeds[3] = cells[ii*params.nx + jj].speeds[3]; /* west */
-            tmp_cells[y_s*params.nx + jj].speeds[4]  = cells[ii*params.nx + jj].speeds[4]; /* south */
-	    tmp_cells[y_n*params.nx + x_e].speeds[5] = cells[ii*params.nx + jj].speeds[5]; /* north-east */
-            tmp_cells[y_n*params.nx + x_w].speeds[6] = cells[ii*params.nx + jj].speeds[6]; /* north-west */
-            tmp_cells[y_s*params.nx + x_w].speeds[7] = cells[ii*params.nx + jj].speeds[7]; /* south-west */
-            tmp_cells[y_s*params.nx + x_e].speeds[8] = cells[ii*params.nx + jj].speeds[8]; /* south-east */
+            tmp_cells[ii *params.nx + x_e] = cells[ii*params.nx + jj*2]; /* east */
+            tmp_cells[y_n*params.nx + jj*2]  = cells[ii*params.nx + jj*3]; /* north */
+            tmp_cells[ii *params.nx + x_w*3] = cells[ii*params.nx + jj*4]; /* west */
+            tmp_cells[y_s*params.nx + jj*4]  = cells[ii*params.nx + jj*5]; /* south */
+	    tmp_cells[y_n*params.nx + x_e*6] = cells[ii*params.nx + jj*6]; /* north-east */
+            tmp_cells[y_n*params.nx + x_w*7] = cells[ii*params.nx + jj*7]; /* north-west */
+            tmp_cells[y_s*params.nx + x_w*8] = cells[ii*params.nx + jj*8]; /* south-west */
+            tmp_cells[y_s*params.nx + x_e*9] = cells[ii*params.nx + jj*9]; /* south-east */
 
 }
 
-__kernel void rebound(const param_t params, __global speed_t* cells,
-	      		     __global speed_t* tmp_cells, __global int* obstacles)
+__kernel void rebound(const param_t params, __global float* cells,
+	      		     __global float* tmp_cells, __global int* obstacles)
 {
 	int ii = get_global_id(0);
 	int jj = get_global_id(1);
 
 	if(obstacles[ii*params.nx + jj])
 	{
-		cells[ii*params.nx+jj].speeds[1] = tmp_cells[ii*params.nx+jj].speeds[3]; 
-		cells[ii*params.nx+jj].speeds[2] = tmp_cells[ii*params.nx+jj].speeds[4]; 
-		cells[ii*params.nx+jj].speeds[3] = tmp_cells[ii*params.nx+jj].speeds[1]; 
-		cells[ii*params.nx+jj].speeds[4] = tmp_cells[ii*params.nx+jj].speeds[2]; 
-		cells[ii*params.nx+jj].speeds[5] = tmp_cells[ii*params.nx+jj].speeds[7]; 
-		cells[ii*params.nx+jj].speeds[6] = tmp_cells[ii*params.nx+jj].speeds[8]; 
-		cells[ii*params.nx+jj].speeds[7] = tmp_cells[ii*params.nx+jj].speeds[5]; 
-		cells[ii*params.nx+jj].speeds[8] = tmp_cells[ii*params.nx+jj].speeds[6]; 
+		cells[ii*params.nx+jj*2] = tmp_cells[ii*params.nx+jj*4]; 
+		cells[ii*params.nx+jj*3] = tmp_cells[ii*params.nx+jj*5]; 
+		cells[ii*params.nx+jj*4] = tmp_cells[ii*params.nx+jj*2]; 
+		cells[ii*params.nx+jj*5] = tmp_cells[ii*params.nx+jj*3]; 
+		cells[ii*params.nx+jj*6] = tmp_cells[ii*params.nx+jj*8]; 
+		cells[ii*params.nx+jj*7] = tmp_cells[ii*params.nx+jj*9]; 
+		cells[ii*params.nx+jj*8] = tmp_cells[ii*params.nx+jj*6]; 
+		cells[ii*params.nx+jj*9] = tmp_cells[ii*params.nx+jj*7]; 
 	}
 }
 
-__kernel void collision(const param_t params, __global speed_t* cells, 
-	      		      __global speed_t* tmp_cells, __global int* obstacles)
+__kernel void collision(const param_t params, __global float* cells, 
+	      		      __global float* tmp_cells, __global int* obstacles)
 {
 	int ii = get_global_id(0);
 	int jj = get_global_id(1);
@@ -143,39 +138,39 @@ __kernel void collision(const param_t params, __global speed_t* cells,
 
 	if(obstacles[ii*params.nx + jj])
 	{
-		cells[ii*params.nx+jj].speeds[1] = tmp_cells[ii*params.nx+jj].speeds[3]; 
-		cells[ii*params.nx+jj].speeds[2] = tmp_cells[ii*params.nx+jj].speeds[4]; 
-		cells[ii*params.nx+jj].speeds[3] = tmp_cells[ii*params.nx+jj].speeds[1]; 
-		cells[ii*params.nx+jj].speeds[4] = tmp_cells[ii*params.nx+jj].speeds[2]; 
-		cells[ii*params.nx+jj].speeds[5] = tmp_cells[ii*params.nx+jj].speeds[7]; 
-		cells[ii*params.nx+jj].speeds[6] = tmp_cells[ii*params.nx+jj].speeds[8]; 
-		cells[ii*params.nx+jj].speeds[7] = tmp_cells[ii*params.nx+jj].speeds[5]; 
-		cells[ii*params.nx+jj].speeds[8] = tmp_cells[ii*params.nx+jj].speeds[6]; 
+		cells[ii*params.nx+jj*2] = tmp_cells[ii*params.nx+jj*4]; 
+		cells[ii*params.nx+jj*3] = tmp_cells[ii*params.nx+jj*5]; 
+		cells[ii*params.nx+jj*4] = tmp_cells[ii*params.nx+jj*2]; 
+		cells[ii*params.nx+jj*5] = tmp_cells[ii*params.nx+jj*3]; 
+		cells[ii*params.nx+jj*6] = tmp_cells[ii*params.nx+jj*8]; 
+		cells[ii*params.nx+jj*7] = tmp_cells[ii*params.nx+jj*9]; 
+		cells[ii*params.nx+jj*8] = tmp_cells[ii*params.nx+jj*6]; 
+		cells[ii*params.nx+jj*9] = tmp_cells[ii*params.nx+jj*7]; 
 	}
 	if(!obstacles[ii*params.nx +jj])
 	{
 		local_density = 0.0;
 		for (kk = 0; kk < NSPEEDS; kk++)
                 {
-                    local_density += tmp_cells[ii*params.nx + jj].speeds[kk];
+                    local_density += tmp_cells[ii*params.nx + jj*(kk+1)];
                 }
 
                 /* compute x velocity component */
-                u_x = (tmp_cells[ii*params.nx + jj].speeds[1] +
-                        tmp_cells[ii*params.nx + jj].speeds[5] +
-                        tmp_cells[ii*params.nx + jj].speeds[8]
-                    - (tmp_cells[ii*params.nx + jj].speeds[3] +
-                        tmp_cells[ii*params.nx + jj].speeds[6] +
-                        tmp_cells[ii*params.nx + jj].speeds[7]))
+                u_x = (tmp_cells[ii*params.nx + jj*2] +
+                        tmp_cells[ii*params.nx + jj*6] +
+                        tmp_cells[ii*params.nx + jj*9]
+                    - (tmp_cells[ii*params.nx + jj*4] +
+                        tmp_cells[ii*params.nx + jj*7] +
+                        tmp_cells[ii*params.nx + jj*8]))
                     / local_density;
 
                 /* compute y velocity component */
-                u_y = (tmp_cells[ii*params.nx + jj].speeds[2] +
-                        tmp_cells[ii*params.nx + jj].speeds[5] +
-                        tmp_cells[ii*params.nx + jj].speeds[6]
-                    - (tmp_cells[ii*params.nx + jj].speeds[4] +
-                        tmp_cells[ii*params.nx + jj].speeds[7] +
-                        tmp_cells[ii*params.nx + jj].speeds[8]))
+                u_y = (tmp_cells[ii*params.nx + jj*3] +
+                        tmp_cells[ii*params.nx + jj*6] +
+                        tmp_cells[ii*params.nx + jj*7]
+                    - (tmp_cells[ii*params.nx + jj*5] +
+                        tmp_cells[ii*params.nx + jj*8] +
+                        tmp_cells[ii*params.nx + jj*9]))
                     / local_density;
 
                 /* velocity squared */
@@ -224,47 +219,14 @@ __kernel void collision(const param_t params, __global speed_t* cells,
 		    /* relaxation step */
         	    for (kk = 0; kk < NSPEEDS; kk++)
            	     {
-			cells[ii*params.nx + jj].speeds[kk] =
-              	       (tmp_cells[ii*params.nx + jj].speeds[kk] + params.omega *
-             		      (d_equ[kk] - tmp_cells[ii*params.nx + jj].speeds[kk]));
+			cells[ii*params.nx + jj*(kk+1)] =
+              	       (tmp_cells[ii*params.nx + jj*(kk+1)] + params.omega *
+             		      (d_equ[kk] - tmp_cells[ii*params.nx + jj*(kk+1)]));
               }
        }
 }
 
-
-double get_velocity(const speed_t cell)
-{
-	int kk = 0;
-	float local_density;
-	float u_x;
-	float u_y;
-
-	local_density = 0.0;
-		for (kk = 0; kk < NSPEEDS; kk++)
-                {
-                    local_density += cell.speeds[kk];
-                }
-
-                u_x = (cell.speeds[1] +
-                        cell.speeds[5] +
-                        cell.speeds[8]
-                    - (cell.speeds[3] +
-                        cell.speeds[6] +
-                        cell.speeds[7])) /
-                    local_density;
-
-                u_y = (cell.speeds[2] +
-                        cell.speeds[5] +
-                        cell.speeds[6]
-                    - (cell.speeds[4] +
-                        cell.speeds[7] +
-                        cell.speeds[8])) /
-                    local_density;
-
-                return sqrt(u_x*u_x + u_y*u_y);
-}
-
-__kernel void av_velocity(const param_t params, __global speed_t * cells, __global int* obstacles,
+__kernel void av_velocity(const param_t params, __global float * cells, __global int* obstacles,
 	      			 __local float* scratch, __global float* results)
 {
 	int global_id = get_global_id(0);
@@ -276,9 +238,40 @@ __kernel void av_velocity(const param_t params, __global speed_t * cells, __glob
 	if(global_id < params.nx * params.ny)
 	{
 		if(!obstacles[global_id])
-			scratch[local_id] = get_velocity(cells[global_id]);
+		{
+		int kk = 0;
+		float local_density;
+		float u_x;
+		float u_y;
+
+		local_density = 0.0;
+		for (kk = 0; kk < NSPEEDS; kk++)
+                {
+                    local_density += cells[global_id+kk];
+                }
+
+                u_x = (cells[global_id+1] +
+                        cells[global_id+5] +
+                        cells[global_id+8]
+                    - (cells[global_id+3] +
+                        cells[global_id+6] +
+                        cells[global_id+7])) /
+                    local_density;
+
+                u_y = (cells[global_id+2] +
+                        cells[global_id+5] +
+                        cells[global_id+6]
+                    - (cells[global_id+4] +
+                        cells[global_id+7] +
+                        cells[global_id+8])) /
+                    local_density;
+
+                scratch[local_id] = sqrt(u_x*u_x + u_y*u_y);
+		}
 		else
+		{
 			scratch[local_id] = 0;
+		}
 	}
 	else 
 	{

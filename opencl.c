@@ -143,7 +143,7 @@ void list_opencl_platforms(void)
 }
 
 void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
-		       lbm_context_t * lbm_context,speed_t * cells, speed_t * tmp_cells,
+		       lbm_context_t * lbm_context,float * cells, float * tmp_cells,
 		       int * obstacles)
 {
     /* get device etc. */
@@ -278,25 +278,25 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
 
     //Allocate cells
     lbm_context->d_cells = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
-			      sizeof(speed_t)*(params.nx*params.ny), NULL, &err);
+			      sizeof(float)*(params.nx*params.ny*NSPEEDS), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for cells", err);
     
     //Write cells to device
     err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_cells, CL_FALSE, 0,
-			       sizeof(speed_t)*(params.nx*params.ny), cells, 0, NULL, NULL);
+			       sizeof(float)*(params.nx*params.ny*NSPEEDS), cells, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write cells to device", err);
 
     // Allocate tmp cells
     lbm_context->d_tmp_cells = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
-			     sizeof(speed_t)*(params.nx*params.ny), NULL, &err);
+			     sizeof(float)*(params.nx*params.ny*NSPEEDS), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for tmp cells", err);
     
     //Write tmp cells to device
     err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_tmp_cells, CL_FALSE, 0,
-			       sizeof(speed_t)*(params.nx*params.ny), tmp_cells, 0, NULL, NULL);
+			       sizeof(float)*(params.nx*params.ny*NSPEEDS), tmp_cells, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write tmp cells to device", err);
     
@@ -319,16 +319,16 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
 
     // Allocate results
     lbm_context->d_results = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
-				  sizeof(float)*(GROUPSIZE), NULL, &err);
+				  sizeof(cl_float)*(GROUPSIZE), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for results", err);
-    float * results = (float*) malloc(sizeof(float)*(GROUPSIZE));
+    cl_float * results = (cl_float*) malloc(sizeof(cl_float)*(GROUPSIZE));
     //initialise empty
     for(int i = 0; i<GROUPSIZE; i++)
       results[i] = 0;
     //Write results
     err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_results, CL_FALSE, 0, 
-			       sizeof(float)*(GROUPSIZE), results, 0, NULL, NULL);
+			       sizeof(cl_float)*(GROUPSIZE), results, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write results to device", err);
     free(results);

@@ -107,7 +107,7 @@ void parse_args (int argc, char* argv[],
 }
 
 void initialise(const char* param_file, accel_area_t * accel_area,
-    param_t* params, speed_t** cells_ptr, speed_t** tmp_cells_ptr,
+    param_t* params, float** cells_ptr, float** tmp_cells_ptr,
     int** obstacles_ptr, float** av_vels_ptr)
 {
     FILE   *fp;            /* file pointer */
@@ -191,10 +191,10 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     fclose(fp);
 
     /* Allocate arrays */
-    *cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
+    *cells_ptr = (float*) malloc(sizeof(float)*(params->ny*params->nx*NSPEEDS));
     if (*cells_ptr == NULL) DIE("Cannot allocate memory for cells");
 
-    *tmp_cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
+    *tmp_cells_ptr = (float*) malloc(sizeof(float)*(params->ny*params->nx*NSPEEDS));
     if (*tmp_cells_ptr == NULL) DIE("Cannot allocate memory for tmp_cells");
 
     *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
@@ -213,17 +213,17 @@ void initialise(const char* param_file, accel_area_t * accel_area,
         for (jj = 0; jj < params->nx; jj++)
         {
             /* centre */
-            (*cells_ptr)[ii*params->nx + jj].speeds[0] = w0;
+            (*cells_ptr)[ii*params->nx + jj] = w0;
             /* axis directions */
-            (*cells_ptr)[ii*params->nx + jj].speeds[1] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[2] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[3] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[4] = w1;
+            (*cells_ptr)[ii*params->nx + jj*2] = w1;
+            (*cells_ptr)[ii*params->nx + jj*3] = w1;
+            (*cells_ptr)[ii*params->nx + jj*4] = w1;
+            (*cells_ptr)[ii*params->nx + jj*5] = w1;
             /* diagonals */
-            (*cells_ptr)[ii*params->nx + jj].speeds[5] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[6] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[7] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[8] = w2;
+            (*cells_ptr)[ii*params->nx + jj*6] = w2;
+            (*cells_ptr)[ii*params->nx + jj*7] = w2;
+            (*cells_ptr)[ii*params->nx + jj*8] = w2;
+            (*cells_ptr)[ii*params->nx + jj*9] = w2;
 
             (*obstacles_ptr)[ii*params->nx + jj] = 0;
         }
@@ -254,7 +254,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     free(obstacles);
 }
 
-void finalise(speed_t** cells_ptr, speed_t** tmp_cells_ptr,
+void finalise(float** cells_ptr, float** tmp_cells_ptr,
     int** obstacles_ptr, float** av_vels_ptr)
 {
     /* Free allocated memory */

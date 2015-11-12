@@ -69,8 +69,8 @@ int main(int argc, char* argv[])
     accel_area_t accel_area;
 
     param_t  params;              /* struct to hold parameter values */
-    speed_t* cells     = NULL;    /* grid containing fluid densities */
-    speed_t* tmp_cells = NULL;    /* scratch space */
+    float* cells     = NULL;    /* grid containing fluid densities */
+    float* tmp_cells = NULL;    /* scratch space */
     int*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
 
@@ -87,11 +87,25 @@ int main(int argc, char* argv[])
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file, &device_id);
 
     initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
+    
     opencl_initialise(device_id, params, accel_area, &lbm_context, cells, tmp_cells, obstacles);
- 
+    
    /* iterate for max_iters timesteps */
     gettimeofday(&timstr,NULL);
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
+
+
+      //Run kernel with auto work group sizes
+      const size_t global[2] = {params.ny, params.nx};
+      const size_t global2 = (accel_area.col_or_row == ACCEL_COLUMN) ? params.ny : params.nx;
+
+
+      const int GLOBALSIZE = params.nx * params.ny;
+      const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
+      const size_t g = GLOBALSIZE;
+      const size_t l = LOCALSIZE;
+      const size_t local[2] = {1, params.nx};
+
 
     cl_int err;
     // kernel arguments
@@ -124,17 +138,6 @@ int main(int argc, char* argv[])
 	DIE("OpenCL error %d, could not set kernel arguments", err);
 
 
-      //Run kernel with auto work group sizes
-      const size_t global[2] = {params.ny, params.nx};
-      const size_t global2 = (accel_area.col_or_row == ACCEL_COLUMN) ? params.ny : params.nx;
-
-
-      const int GLOBALSIZE = params.nx * params.ny;
-      //const size_t LOCALSIZE = GLOBALSIZE/32;
-      const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
-      const size_t g = GLOBALSIZE;
-      const size_t l = LOCALSIZE;
-
       int tot_cells = 0;
       for (ii = 0; ii < params.ny; ii++)
 	{
@@ -154,34 +157,32 @@ int main(int argc, char* argv[])
 
       err = clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_flow,1,NULL,&global2,NULL,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_propagate,2,NULL,global,NULL,0, NULL, NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_propagate,2,NULL,global,local,0, NULL, NULL);
 
       //err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_rebound,2,NULL,global,NULL,0, NULL, NULL);
 
-      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,NULL,0, NULL, NULL);
+      err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,local,0, NULL, NULL);
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&g,&l,0,NULL,NULL);
 
       if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not run kernel",err);
-
-      float * results = (float*) malloc(sizeof(float)*(GROUPSIZE));
+      
+      cl_float * results = (cl_float*) malloc(sizeof(cl_float)*(GROUPSIZE));
       err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
 				      sizeof(float)*(GROUPSIZE),results,0,NULL,NULL);
+
+	    if(err != CL_SUCCESS)
+	      DIE("OpenCL error %d, could not read buffer", err);
+
 	    for(int x = 0; x < (GROUPSIZE); x ++)
 	      {
-		//	printf("results: %.12E\n", results[x]);
+		//				printf("results: %.12E\n", results[x]);
 		av_vels[ii]+=results[x];
 	      }
 	    av_vels[ii] = av_vels[ii]/ (float) tot_cells;
 
 	    free(results);
-      if(err != CL_SUCCESS)
-	DIE("OpenCL error %d, could not read buffer", err);
-
-      //rebound(params, cells, tmp_cells, obstacles);
-      //collision(params,cells,tmp_cells,obstacles);
-      //av_vels[ii] = av_velocity(params, cells, obstacles);
 
        #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
@@ -191,7 +192,7 @@ int main(int argc, char* argv[])
     }
 
     err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_cells, CL_TRUE, 0, 
-      		sizeof(speed_t)*(params.nx*params.ny),cells,0,NULL,NULL);
+      		sizeof(float)*(params.nx*params.ny*NSPEEDS),cells,0,NULL,NULL);
       	
 
     // Do not remove this, or the timing will be incorrect!
@@ -219,7 +220,7 @@ int main(int argc, char* argv[])
 }
 
 void write_values(const char * final_state_file, const char * av_vels_file,
-    const param_t params, speed_t* cells, int* obstacles, float* av_vels)
+    const param_t params, float* cells, int* obstacles, float* av_vels)
 {
     FILE* fp;                     /* file pointer */
     int ii,jj,kk;                 /* generic counters */
@@ -254,25 +255,25 @@ void write_values(const char * final_state_file, const char * av_vels_file,
 
                 for (kk = 0; kk < NSPEEDS; kk++)
                 {
-                    local_density += cells[ii*params.nx + jj].speeds[kk];
+		  local_density += cells[ii*params.nx + jj*(kk+1)];
                 }
 
                 /* compute x velocity component */
-                u_x = (cells[ii*params.nx + jj].speeds[1] +
-                        cells[ii*params.nx + jj].speeds[5] +
-                        cells[ii*params.nx + jj].speeds[8]
-                    - (cells[ii*params.nx + jj].speeds[3] +
-                        cells[ii*params.nx + jj].speeds[6] +
-                        cells[ii*params.nx + jj].speeds[7]))
+                u_x = (cells[ii*params.nx + jj*2] +
+                        cells[ii*params.nx + jj*6] +
+                        cells[ii*params.nx + jj*9]
+                    - (cells[ii*params.nx + jj*4] +
+                        cells[ii*params.nx + jj*7] +
+                        cells[ii*params.nx + jj*8]))
                     / local_density;
 
                 /* compute y velocity component */
-                u_y = (cells[ii*params.nx + jj].speeds[2] +
-                        cells[ii*params.nx + jj].speeds[5] +
-                        cells[ii*params.nx + jj].speeds[6]
-                    - (cells[ii*params.nx + jj].speeds[4] +
-                        cells[ii*params.nx + jj].speeds[7] +
-                        cells[ii*params.nx + jj].speeds[8]))
+                u_y = (cells[ii*params.nx + jj*3] +
+                        cells[ii*params.nx + jj*6] +
+                        cells[ii*params.nx + jj*7]
+                    - (cells[ii*params.nx + jj*5] +
+                        cells[ii*params.nx + jj*8] +
+                        cells[ii*params.nx + jj*9]))
                     / local_density;
 
                 /* compute norm of velocity */
@@ -311,7 +312,7 @@ float calc_reynolds(const param_t params, float av_vel)
     return av_vel * params.reynolds_dim / viscosity;
 }
 
-float total_density(const param_t params, speed_t* cells)
+float total_density(const param_t params, float* cells)
 {
     int ii,jj,kk;        /* generic counters */
     float total = 0.0;  /* accumulator */
@@ -322,8 +323,7 @@ float total_density(const param_t params, speed_t* cells)
         {
             for (kk = 0; kk < NSPEEDS; kk++)
             {
-                total += cells[ii*params.nx + jj].speeds[kk];
-            }
+	      total += cells[ii*params.nx + jj*(kk+1)];            }
         }
     }
 
