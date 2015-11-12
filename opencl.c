@@ -144,7 +144,7 @@ void list_opencl_platforms(void)
 
 void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
 		       lbm_context_t * lbm_context,speed_t * cells, speed_t * tmp_cells,
-		       int * obstacles)
+		       int * obstacles, bounds_t bounds)
 {
     /* get device etc. */
     cl_platform_id * platforms = NULL;
@@ -274,47 +274,45 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
       DIE("OpenCL error %d, when trying to create velocity kernel", err);
 
 
-    //Allocate device memory
-
     //Allocate cells
     lbm_context->d_cells = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
-			      sizeof(speed_t)*(params.nx*params.ny), NULL, &err);
+			      sizeof(speed_t)*(bounds.x * bounds.y), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for cells", err);
     
     //Write cells to device
     err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_cells, CL_FALSE, 0,
-			       sizeof(speed_t)*(params.nx*params.ny), cells, 0, NULL, NULL);
+			       sizeof(speed_t)*(bounds.x * bounds.y), cells, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write cells to device", err);
 
     // Allocate tmp cells
     lbm_context->d_tmp_cells = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
-			     sizeof(speed_t)*(params.nx*params.ny), NULL, &err);
+			     sizeof(speed_t)*(bounds.x*bounds.y), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for tmp cells", err);
     
     //Write tmp cells to device
-    err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_tmp_cells, CL_FALSE, 0,
-			       sizeof(speed_t)*(params.nx*params.ny), tmp_cells, 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_cells, CL_FALSE, 0,
+			       sizeof(speed_t)*(bounds.x*bounds.y), cells, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write tmp cells to device", err);
     
     // Allocate obstacles
     lbm_context->d_obstacles = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
-				  sizeof(int)*(params.nx*params.ny), NULL, &err);
+				  sizeof(int)*(bounds.x*bounds.y), NULL, &err);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not allocate memory for obstacles", err);
     
     //Write obstacles to device
     err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_obstacles, CL_FALSE, 0, 
-			       sizeof(int)*(params.nx*params.ny), obstacles, 0, NULL, NULL);
+			       sizeof(int)*(bounds.x*bounds.y), obstacles, 0, NULL, NULL);
     if(err != CL_SUCCESS)
       DIE("OpenCL error %d, could not write obstacles to device", err);
 
 
 
-    const int GLOBALSIZE = params.nx * params.ny;
+    const int GLOBALSIZE = bounds.x*bounds.y;
     const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
 
     // Allocate results

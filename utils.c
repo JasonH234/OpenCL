@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <getopt.h>
-
+#include <math.h>
 #include "lbm.h"
 
 void exit_with_error(int line, const char* filename, const char* format, ...)
@@ -107,8 +107,9 @@ void parse_args (int argc, char* argv[],
 }
 
 void initialise(const char* param_file, accel_area_t * accel_area,
-    param_t* params, speed_t** cells_ptr, speed_t** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr)
+		param_t* params, float** av_vels_ptr, 
+		speed_t** cropped_cells, speed_t** cropped_tmp_cells, int** cropped_obstacles,
+		bounds_t* bounds)
 {
     FILE   *fp;            /* file pointer */
     int    ii,jj, kk;          /* generic counters */
@@ -190,44 +191,15 @@ void initialise(const char* param_file, accel_area_t * accel_area,
     /* close file */
     fclose(fp);
 
-    /* Allocate arrays */
-    *cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
-    if (*cells_ptr == NULL) DIE("Cannot allocate memory for cells");
 
-    *tmp_cells_ptr = (speed_t*) malloc(sizeof(speed_t)*(params->ny*params->nx));
-    if (*tmp_cells_ptr == NULL) DIE("Cannot allocate memory for tmp_cells");
-
-    *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
-    if (*obstacles_ptr == NULL) DIE("Cannot allocate memory for patches");
+    int *obstacles_ptr = (int*) malloc(sizeof(int)*(params->ny*params->nx));
+    if (obstacles_ptr == NULL) DIE("Cannot allocate memory for patches");
 
     *av_vels_ptr = (float*) malloc(sizeof(float)*(params->max_iters));
     if (*av_vels_ptr == NULL) DIE("Cannot allocate memory for av_vels");
 
-    w0 = params->density * 4.0/9.0;
-    w1 = params->density      /9.0;
-    w2 = params->density      /36.0;
 
-    /* Initialise arrays */
-    for (ii = 0; ii < params->ny; ii++)
-    {
-        for (jj = 0; jj < params->nx; jj++)
-        {
-            /* centre */
-            (*cells_ptr)[ii*params->nx + jj].speeds[0] = w0;
-            /* axis directions */
-            (*cells_ptr)[ii*params->nx + jj].speeds[1] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[2] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[3] = w1;
-            (*cells_ptr)[ii*params->nx + jj].speeds[4] = w1;
-            /* diagonals */
-            (*cells_ptr)[ii*params->nx + jj].speeds[5] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[6] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[7] = w2;
-            (*cells_ptr)[ii*params->nx + jj].speeds[8] = w2;
-
-            (*obstacles_ptr)[ii*params->nx + jj] = 0;
-        }
-    }
+   int min_x = -1, min_y = -1, max_x = -1, max_y = -1;
 
     /* Fill in locations of obstacles */
     for (ii = 0; ii < params->ny; ii++)
@@ -237,6 +209,7 @@ void initialise(const char* param_file, accel_area_t * accel_area,
             /* coordinates of (jj, ii) scaled to 'real world' terms */
             const float x_pos = jj*(BOX_X_SIZE/params->nx);
             const float y_pos = ii*(BOX_Y_SIZE/params->ny);
+	    int is_obstacle = 0;
 
             for (kk = 0; kk < n_obstacles; kk++)
             {
@@ -245,22 +218,103 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                     y_pos >= obstacles[kk].obs_y_min &&
                     y_pos <  obstacles[kk].obs_y_max)
                 {
-                    (*obstacles_ptr)[ii*params->nx + jj] = 1;
+                    obstacles_ptr[ii*params->nx + jj] = 1.0;
+		    is_obstacle = 1;
                 }
             }
+	    if(!is_obstacle)
+	      {
+		if( ii < min_y || min_y == -1)
+		  {
+		    min_y = ii;
+		  }
+		if (ii > max_y || max_y == -1)
+		  {
+		    max_y = ii;
+		  }
+		if (jj < min_x || min_x == -1)
+		  {
+		    min_x = jj;
+		  }
+		if (jj > max_x || max_x == -1)
+		  {
+		    max_x = jj;
+		  }
+	      }
+	    else
+	      {
+		obstacles_ptr[ii*params->nx+jj] = 0.0;
+	      }
         }
     }
+    //pad
+    min_x = (min_x -1 > 0) ? min_x-2 : 0;
+    max_x = (max_x +1 < params->nx) ? max_x+2: params->nx;
+    min_y = (min_y -1 > 0) ? min_y -2 : 0;
+    max_y = (max_y +1 < params->ny) ? max_y+2 : params->ny;
+
+    int x_size = max_x - min_x;
+    int y_size = max_y - min_y;
+    //y_size = pow(2, ceil(log(y_size)/log(2)));
+    bounds->x = x_size;
+    bounds->y = y_size;
+    bounds->minx = min_x;
+    bounds->maxx = max_x;
+    bounds->miny = min_y;
+    bounds->maxy = max_y;
+
+    /* Allocate arrays */
+    *cropped_cells = (speed_t*) malloc(sizeof(speed_t)*(x_size*y_size));
+    if (*cropped_cells == NULL) DIE("Cannot allocate memory for cropped cells");
+
+    *cropped_obstacles = (int*) malloc(sizeof(int)*(x_size*y_size));
+
+    w0 = params->density * 4.0/9.0;
+    w1 = params->density      /9.0;
+    w2 = params->density      /36.0;
+    printf("%d %d MINS %d %d \n", min_x, min_y, x_size, y_size);
+    /* Initialise arrays */
+    for (ii = 0; ii < y_size; ii++)
+    {
+        for (jj = 0; jj < x_size; jj++)
+        {
+	  
+	    //centre
+            (*cropped_cells)[ii*x_size + jj].speeds[0] = w0;
+            // axis directions
+            (*cropped_cells)[ii*x_size + jj].speeds[1] = w1;
+            (*cropped_cells)[ii*x_size + jj].speeds[2] = w1;
+            (*cropped_cells)[ii*x_size + jj].speeds[3] = w1;
+            (*cropped_cells)[ii*x_size + jj].speeds[4] = w1;
+            // diagonals
+            (*cropped_cells)[ii*x_size + jj].speeds[5] = w2;
+            (*cropped_cells)[ii*x_size + jj].speeds[6] = w2;
+            (*cropped_cells)[ii*x_size + jj].speeds[7] = w2;
+            (*cropped_cells)[ii*x_size + jj].speeds[8] = w2;
+	    if(obstacles_ptr[(ii+min_y)*x_size+(jj+min_x)])
+	    {
+		(*cropped_obstacles)[ii*x_size+jj] = 1;
+	      }
+	    else 
+	      {
+		(*cropped_obstacles)[ii*x_size+jj]=0;
+	      }
+        }
+    }    
 
     free(obstacles);
+    free(obstacles_ptr);
 }
 
-void finalise(speed_t** cells_ptr, speed_t** tmp_cells_ptr,
-    int** obstacles_ptr, float** av_vels_ptr)
+void finalise(speed_t** cells_ptr, int** obstacles_ptr, float** av_vels_ptr, 
+	      speed_t** cropped_cells, speed_t** cropped_tmp_cells, int** cropped_obstacles)
 {
     /* Free allocated memory */
     free(*cells_ptr);
-    free(*tmp_cells_ptr);
     free(*obstacles_ptr);
     free(*av_vels_ptr);
+    free(*cropped_cells);
+    free(*cropped_tmp_cells);
+    free(*cropped_obstacles);
 }
 

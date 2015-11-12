@@ -69,11 +69,12 @@ int main(int argc, char* argv[])
     accel_area_t accel_area;
 
     param_t  params;              /* struct to hold parameter values */
-    speed_t* cells     = NULL;    /* grid containing fluid densities */
-    speed_t* tmp_cells = NULL;    /* scratch space */
-    int*     obstacles = NULL;    /* grid indicating which cells are blocked */
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
-
+    //cropped cells
+    speed_t* cropped_cells = NULL;
+    speed_t* cropped_tmp_cells = NULL;
+    int* cropped_obstacles = NULL;
+    bounds_t bounds;
     int    ii;                    /*  generic counter */
     struct timeval timstr;        /* structure to hold elapsed time */
     struct rusage ru;             /* structure to hold CPU time--system and user */
@@ -86,13 +87,20 @@ int main(int argc, char* argv[])
 
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file, &device_id);
 
-    initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
-    opencl_initialise(device_id, params, accel_area, &lbm_context, cells, tmp_cells, obstacles);
+    initialise(param_file, &accel_area, &params, &av_vels,
+	       &cropped_cells, &cropped_tmp_cells, &cropped_obstacles, &bounds);
+
+    opencl_initialise(device_id, params, accel_area, &lbm_context, cropped_cells, cropped_tmp_cells, cropped_obstacles, bounds);
  
    /* iterate for max_iters timesteps */
     gettimeofday(&timstr,NULL);
     tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
+    int full_x = params.nx;
+    int full_y = params.ny;
+    params.nx = bounds.x;
+    params.ny = bounds.y;
+    printf("Params %d %d \n", bounds.x, bounds.y);
     cl_int err;
     // kernel arguments
       err = clSetKernelArg(lbm_context.k_flow, 0, sizeof(param_t), &params);
@@ -122,35 +130,32 @@ int main(int argc, char* argv[])
      
       if (err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not set kernel arguments", err);
-
+      
 
       //Run kernel with auto work group sizes
       const size_t global[2] = {params.ny, params.nx};
       const size_t global2 = (accel_area.col_or_row == ACCEL_COLUMN) ? params.ny : params.nx;
 
 
-      const int GLOBALSIZE = params.nx * params.ny;
+      const int GLOBALSIZE = bounds.x * bounds.y;
       //const size_t LOCALSIZE = GLOBALSIZE/32;
+      printf("Globalsize: %d", GLOBALSIZE);
       const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
       const size_t g = GLOBALSIZE;
       const size_t l = LOCALSIZE;
-
+      printf("%d %d %d\n", GLOBALSIZE, LOCALSIZE, GROUPSIZE);
       int tot_cells = 0;
-      for (ii = 0; ii < params.ny; ii++)
+      for (ii = 0; ii < bounds.y; ii++)
 	{
-	  for(int jj = 0; jj < params.nx; jj++)
+	  for(int jj = 0; jj < bounds.x; jj++)
 	    {
-	      if(!obstacles[ii*params.nx + jj])
+	      if(!cropped_obstacles[ii*params.nx + jj])
 		tot_cells ++;
 	    }
 	}
 
     for (ii = 0; ii < params.max_iters; ii++)
     {
-
-      if(err != CL_SUCCESS)
-	DIE("OpenCL error %d, could not write to buffer",err);
-           
 
       err = clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_flow,1,NULL,&global2,NULL,0, NULL, NULL);
 
@@ -168,16 +173,17 @@ int main(int argc, char* argv[])
       float * results = (float*) malloc(sizeof(float)*(GROUPSIZE));
       err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
 				      sizeof(float)*(GROUPSIZE),results,0,NULL,NULL);
+
+      if(err != CL_SUCCESS)
+	DIE("OpenCL error %d, could not read buffer", err);
+
 	    for(int x = 0; x < (GROUPSIZE); x ++)
 	      {
-		//	printf("results: %.12E\n", results[x]);
 		av_vels[ii]+=results[x];
 	      }
 	    av_vels[ii] = av_vels[ii]/ (float) tot_cells;
 
 	    free(results);
-      if(err != CL_SUCCESS)
-	DIE("OpenCL error %d, could not read buffer", err);
 
       //rebound(params, cells, tmp_cells, obstacles);
       //collision(params,cells,tmp_cells,obstacles);
@@ -191,8 +197,49 @@ int main(int argc, char* argv[])
     }
 
     err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_cells, CL_TRUE, 0, 
-      		sizeof(speed_t)*(params.nx*params.ny),cells,0,NULL,NULL);
-      	
+			      sizeof(speed_t)*(bounds.x*bounds.y),cropped_cells,0,NULL,NULL);
+
+    // restore uncropped params
+    params.nx = full_x;
+    params.ny = full_y;
+
+    speed_t* cells     = NULL;    /* grid containing fluid densities */
+    int*     obstacles = NULL;    /* grid indicating which cells are blocked */
+    cells = (speed_t*) malloc(sizeof(speed_t)*params.nx*params.ny);
+    obstacles = (int*) malloc(sizeof(int)*params.nx*params.ny);
+    for(ii = 0; ii < params.ny; ii++)
+      {
+	for(int jj = 0; jj < params.nx; jj++)
+	  {
+	    if(ii >= bounds.miny && ii <= bounds.maxy &&
+	       jj >= bounds.minx && jj <= bounds.maxx)
+	      {
+		if(!cropped_obstacles[(ii-bounds.miny)*bounds.x + (jj-bounds.minx)])
+		  {
+		    cells[ii*params.nx+jj] = cropped_cells[(ii-bounds.miny)*bounds.x+(jj-bounds.minx)];
+		    obstacles[ii*params.nx+jj] = 0;
+		  }
+		else
+		  {
+		    obstacles[ii*params.nx+jj] = 1;
+		  }
+	      }
+	    else
+	      {
+		cells[ii*params.nx+jj].speeds[0] = 0;
+		cells[ii*params.nx+jj].speeds[1] = 0;
+		cells[ii*params.nx+jj].speeds[2] = 0;
+		cells[ii*params.nx+jj].speeds[3] = 0;
+	        cells[ii*params.nx+jj].speeds[4] = 0;
+		cells[ii*params.nx+jj].speeds[5] = 0;
+		cells[ii*params.nx+jj].speeds[6] = 0;
+		cells[ii*params.nx+jj].speeds[7] = 0;
+		cells[ii*params.nx+jj].speeds[8] = 0;
+		obstacles[ii*params.nx+jj] = 1;
+	      }
+	    
+	  }
+      }
 
     // Do not remove this, or the timing will be incorrect!
     clFinish(lbm_context.queue);
@@ -212,7 +259,7 @@ int main(int argc, char* argv[])
     printf("Elapsed system CPU time:\t%.6f (s)\n", systim);
 
     write_values(final_state_file, av_vels_file, params, cells, obstacles, av_vels);
-    finalise(&cells, &tmp_cells, &obstacles, &av_vels);
+    finalise(&cells,&obstacles, &av_vels, &cropped_cells, &cropped_tmp_cells, &cropped_obstacles);
     opencl_finalise(lbm_context);
 
     return EXIT_SUCCESS;
