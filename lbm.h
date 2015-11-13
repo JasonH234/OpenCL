@@ -52,7 +52,6 @@ typedef struct {
   cl_mem d_tmp_cells;
   cl_mem d_obstacles;
   cl_mem d_results;
-  cl_mem d_results_counter;
 } lbm_context_t;
 
 typedef enum { ACCEL_ROW=0, ACCEL_COLUMN=1 } accel_e;

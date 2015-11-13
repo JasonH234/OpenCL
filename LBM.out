@@ -1,0 +1,18 @@
+Running on host node46-004
+Time is Fri Nov 13 10:12:54 GMT 2015
+Directory is /panfs/panasas01/cosc/jh13290/opencl/simulation
+PBS job ID is 3684284.master.cm.cluster
+This jobs runs on the following machines:
+node46-004
+Using device 0
+./lbm -a ./av_vels.dat -f ./final_state.dat -p ../inputs/large_pipe.params -d 0
+Got OpenCL device:
+ Device 0: Tesla K20m (GPU)
+Created OpenCL context
+Building program
+Finished initialising OpenCL
+==done==
+Reynolds number:		8.530661582947E+00
+Elapsed time:			9.755487 (s)
+Elapsed user CPU time:		6.619993 (s)
+Elapsed system CPU time:	3.831417 (s)

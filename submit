@@ -1,0 +1,43 @@
+#!/bin/bash
+
+#PBS -N LBM
+#PBS -joe
+#PBS -o LBM.out
+#PBS -q teaching
+#PBS -l nodes=1:ppn=8:gpus=1,walltime=00:30:00
+
+#! Mail to user if job aborts
+#PBS -m a
+
+#! application name
+application="make run"
+
+# Select the GPU that we've been allocated
+device=$(cat $PBS_GPUFILE)
+device=${device#*gpu}
+
+#! Run options for the application
+options="PARAM_FILE=../inputs/large_pipe.params DEVICE=$device"
+
+###############################################################
+### You should not have to change anything below this line ####
+###############################################################
+
+#! change the working directory (default is home directory)
+
+cd $PBS_O_WORKDIR
+
+echo Running on host `hostname`
+echo Time is `date`
+echo Directory is `pwd`
+echo PBS job ID is $PBS_JOBID
+echo This jobs runs on the following machines:
+echo `cat $PBS_NODEFILE | uniq`
+echo "Using device $device"
+
+numnodes=`wc $PBS_NODEFILE | awk '{ print $1 }'`
+
+export OMP_NUM_THREADS=$numnodes
+
+#! Run the executable
+$application $options

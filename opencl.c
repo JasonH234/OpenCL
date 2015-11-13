@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
-
+#include <stdlib.h>
 #include "lbm.h"
 
 void get_opencl_platforms(cl_platform_id ** platforms, cl_uint * num_platforms)
@@ -232,6 +232,7 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
 
     fprintf(stdout, "Building program\n");
 
+    
     err = clBuildProgram(program, 1, &lbm_context->device, NULL, NULL, NULL);
 
     if (err == CL_BUILD_PROGRAM_FAILURE)
