@@ -314,9 +314,9 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
       DIE("OpenCL error %d, could not write obstacles to device", err);
 
 
-
+    const int local_size = (LOCALSIZE > params.nx) ? params.nx : LOCALSIZE;
     const int GLOBALSIZE = params.nx * params.ny;
-    const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
+    const int GROUPSIZE = GLOBALSIZE/local_size;
 
     // Allocate results
     lbm_context->d_results = clCreateBuffer(lbm_context->context, CL_MEM_READ_WRITE, 
@@ -325,7 +325,7 @@ void opencl_initialise(int device_id, param_t params, accel_area_t accel_area,
       DIE("OpenCL error %d, could not allocate memory for results", err);
     cl_float * results = (cl_float*) malloc(sizeof(cl_float)*(GROUPSIZE));
     //initialise empty
-    for(int i = 0; i<GROUPSIZE; i++)
+    for(i = 0; i<GROUPSIZE; i++)
       results[i] = 0;
     //Write results
     err = clEnqueueWriteBuffer(lbm_context->queue, lbm_context->d_results, CL_FALSE, 0, 

@@ -75,6 +75,7 @@ int main(int argc, char* argv[])
     float*  av_vels   = NULL;    /* a record of the av. velocity computed for each timestep */
 
     int    ii;                    /*  generic counter */
+    int jj;
     struct timeval timstr;        /* structure to hold elapsed time */
     struct rusage ru;             /* structure to hold CPU time--system and user */
     double tic,toc;               /* floating point numbers to calculate elapsed wallclock time */
@@ -93,10 +94,11 @@ int main(int argc, char* argv[])
       const size_t global[2] = {params.ny, params.nx};
       const size_t global2 = (accel_area.col_or_row == ACCEL_COLUMN) ? params.ny : params.nx;
       const int GLOBALSIZE = params.nx * params.ny;
-      const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
+      const int local_size = (LOCALSIZE > params.nx) ? params.nx : LOCALSIZE;
+      const int GROUPSIZE = GLOBALSIZE/local_size;
       const size_t g = GLOBALSIZE;
-      const size_t l = LOCALSIZE;
-      const size_t local[2] = {1, LOCALSIZE};
+      const size_t l = local_size;
+      const size_t local[2] = {1, local_size};
     
     opencl_initialise(device_id, params, accel_area, &lbm_context, cells, tmp_cells, obstacles);
     
@@ -119,7 +121,7 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_velocity, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_velocity, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_velocity, 2, sizeof(cl_mem), &lbm_context.d_obstacles);
-      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(cl_float)*LOCALSIZE,NULL);
+      err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(cl_float)*local_size,NULL);
       err |= clSetKernelArg(lbm_context.k_velocity, 4, sizeof(cl_mem), &lbm_context.d_results);
 
 
@@ -134,7 +136,7 @@ int main(int argc, char* argv[])
       int tot_cells = 0;
       for (ii = 0; ii < params.ny; ii++)
 	{
-	  for(int jj = 0; jj < params.nx; jj++)
+	  for(jj = 0; jj < params.nx; jj++)
 	    {
 	      if(!obstacles[ii*params.nx + jj])
 		tot_cells ++;
@@ -166,11 +168,9 @@ int main(int argc, char* argv[])
 	    if(err != CL_SUCCESS)
 	      DIE("OpenCL error %d, could not read buffer", err);
 
-	    for(int x = 0; x < (GROUPSIZE); x ++)
+	    for(jj = 0; jj < (GROUPSIZE); jj ++)
 	      {
-		//if(results[x] > 0 || results[x] < 0)
-		  //printf("results:[%d][%d], %.12E\n", ii, x, results[x]);
-		av_vels[ii]+=results[x];
+		av_vels[ii]+=results[jj];
 	      }
 	    av_vels[ii] = av_vels[ii]/ (float) tot_cells;
 
