@@ -145,6 +145,10 @@ __kernel void collision(const param_t params, __global float* cells,
 	float u[NSPEEDS];
 	float d_equ[NSPEEDS];
 
+	//obstacles[ii*params.nx+jj] ? 
+	
+
+
 	if(obstacles[ii*params.nx + jj])
 	{
 		cells[ii*params.nx+jj+(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+3*(params.nx*params.ny)]; 
@@ -156,7 +160,7 @@ __kernel void collision(const param_t params, __global float* cells,
 		cells[ii*params.nx+jj+7*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+5*(params.nx*params.ny)]; 
 		cells[ii*params.nx+jj+8*(params.nx*params.ny)] = tmp_cells[ii*params.nx+jj+6*(params.nx*params.ny)]; 
 	}
-	if(!obstacles[ii*params.nx +jj])
+	else
 	{
 		local_density = 0.0;
 

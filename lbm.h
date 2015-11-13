@@ -18,6 +18,10 @@
 typedef struct {
     cl_int nx;            /* no. of cells in x-direction */
     cl_int ny;            /* no. of cells in y-direction */
+  cl_int min_y;
+  cl_int min_x;
+  cl_int max_y;
+  cl_int max_x;
     cl_int max_iters;      /* no. of iterations */
     cl_int reynolds_dim;  /* dimension for Reynolds number */
     cl_float density;       /* density per link */
@@ -48,6 +52,7 @@ typedef struct {
   cl_mem d_tmp_cells;
   cl_mem d_obstacles;
   cl_mem d_results;
+  cl_mem d_results_counter;
 } lbm_context_t;
 
 typedef enum { ACCEL_ROW=0, ACCEL_COLUMN=1 } accel_e;

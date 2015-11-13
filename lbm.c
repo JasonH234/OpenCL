@@ -84,29 +84,22 @@ int main(int argc, char* argv[])
     int device_id;
     lbm_context_t lbm_context;
 
+
     parse_args(argc, argv, &final_state_file, &av_vels_file, &param_file, &device_id);
 
     initialise(param_file, &accel_area, &params, &cells, &tmp_cells, &obstacles, &av_vels);
-    
-    opencl_initialise(device_id, params, accel_area, &lbm_context, cells, tmp_cells, obstacles);
-    
-   /* iterate for max_iters timesteps */
-    gettimeofday(&timstr,NULL);
-    tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
 
-
-      //Run kernel with auto work group sizes
+      //Global/local/group sizes
       const size_t global[2] = {params.ny, params.nx};
       const size_t global2 = (accel_area.col_or_row == ACCEL_COLUMN) ? params.ny : params.nx;
-
-
       const int GLOBALSIZE = params.nx * params.ny;
       const int GROUPSIZE = GLOBALSIZE/LOCALSIZE;
       const size_t g = GLOBALSIZE;
       const size_t l = LOCALSIZE;
       const size_t local[2] = {1, LOCALSIZE};
-
-
+    
+    opencl_initialise(device_id, params, accel_area, &lbm_context, cells, tmp_cells, obstacles);
+    
     cl_int err;
     // kernel arguments
       err = clSetKernelArg(lbm_context.k_flow, 0, sizeof(param_t), &params);
@@ -117,12 +110,7 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_propagate, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_propagate, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_propagate, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
-      /*
-      err |= clSetKernelArg(lbm_context.k_rebound, 0, sizeof(param_t), &params);
-      err |= clSetKernelArg(lbm_context.k_rebound, 1, sizeof(cl_mem), &lbm_context.d_cells);
-      err |= clSetKernelArg(lbm_context.k_rebound, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
-      err |= clSetKernelArg(lbm_context.k_rebound, 3, sizeof(cl_mem), &lbm_context.d_obstacles);
-*/      
+        
       err |= clSetKernelArg(lbm_context.k_collision, 0, sizeof(param_t), &params);
       err |= clSetKernelArg(lbm_context.k_collision, 1, sizeof(cl_mem), &lbm_context.d_cells);
       err |= clSetKernelArg(lbm_context.k_collision, 2, sizeof(cl_mem), &lbm_context.d_tmp_cells);
@@ -133,11 +121,16 @@ int main(int argc, char* argv[])
       err |= clSetKernelArg(lbm_context.k_velocity, 2, sizeof(cl_mem), &lbm_context.d_obstacles);
       err |= clSetKernelArg(lbm_context.k_velocity, 3, sizeof(cl_float)*LOCALSIZE,NULL);
       err |= clSetKernelArg(lbm_context.k_velocity, 4, sizeof(cl_mem), &lbm_context.d_results);
+
+
+   /* iterate for max_iters timesteps */
+    gettimeofday(&timstr,NULL);
+    tic=timstr.tv_sec+(timstr.tv_usec/1000000.0);
      
       if (err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not set kernel arguments", err);
 
-
+      //calculate total number of non obstacle cells
       int tot_cells = 0;
       for (ii = 0; ii < params.ny; ii++)
 	{
