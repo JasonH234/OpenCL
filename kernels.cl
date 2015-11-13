@@ -6,6 +6,10 @@
 typedef struct {
     int nx;            /* no. of cells in x-direction */
     int ny;            /* no. of cells in y-direction */
+    int min_y;
+    int min_x;
+    int max_y;
+    int max_x;
     int max_iters;      /* no. of iterations */
     int reynolds_dim;  /* dimension for Reynolds number */
     float density;       /* density per link */
@@ -79,6 +83,9 @@ __kernel void propagate(const param_t params, __global float* cells, __global fl
 {
 	int ii = get_global_id(0);
 	int jj = get_global_id(1);
+	if(ii < params.min_y || ii > params.max_y || jj < params.min_x || jj > params.max_x)
+	return;
+
             int x_e,x_w,y_n,y_s;  /* indices of neighbouring cells */
             /* determine indices of axis-direction neighbours
 	    ** respecting periodic boundary conditions (wrap around) */
@@ -124,6 +131,8 @@ __kernel void collision(const param_t params, __global float* cells,
 {
 	int ii = get_global_id(0);
 	int jj = get_global_id(1);
+	if(ii < params.min_y || ii > params.max_y || jj < params.min_x || jj > params.max_x)
+	return;
 	int kk = 0;
 	const float c_sq = 1.0/3.0;
 	const float w0 = 4.0/9.0;

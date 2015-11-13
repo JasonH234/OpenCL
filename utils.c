@@ -229,12 +229,61 @@ void initialise(const char* param_file, accel_area_t * accel_area,
         }
     }
 
+    int min_x = -1, min_y = -1, max_x = -1, max_y = -1;
+
     /* Fill in locations of obstacles */
+    for (ii = 0; ii < params->ny; ii++)
+      {
+        for (jj = 0; jj < params->nx; jj++)
+	  {
+            /* coordinates of (jj, ii) scaled to 'real world' terms */
+            const float x_pos = jj*(BOX_X_SIZE/params->nx);
+            const float y_pos = ii*(BOX_Y_SIZE/params->ny);
+            int is_obstacle = 0;
+	    for (kk = 0; kk < n_obstacles; kk++)
+	      {
+                if (x_pos >= obstacles[kk].obs_x_min &&
+                    x_pos <  obstacles[kk].obs_x_max &&
+                    y_pos >= obstacles[kk].obs_y_min &&
+                    y_pos <  obstacles[kk].obs_y_max)
+		  {
+                    (*obstacles_ptr)[ii*params->nx + jj] = 1;
+                    is_obstacle = 1;
+
+		  }
+	      }
+	    if (!is_obstacle)
+              {
+                if (ii < min_y || min_y == -1)
+                  {
+                    min_y = ii;
+                  }
+                if (ii > max_y || max_y == -1)
+                  {
+                    max_y = ii;
+                  }
+                if (jj < min_x || min_x == -1)
+                  {
+                    min_x = jj;
+                  }
+                if (jj > max_x || max_x == -1)
+                  {
+                    max_x = jj;
+                  }
+              } 
+	  }
+      }
+    params->min_x = (min_x - 1 > 0) ? min_x-2 : 0;
+    params->max_x = (max_x + 1 < params->nx) ? max_x+2:params->nx;
+    params->min_y = (min_y - 1 > 0) ? min_y-2 : 0;
+    params->max_y = (max_y + 1 < params->ny) ? max_y+2:params->ny;
+
+    /*
     for (ii = 0; ii < params->ny; ii++)
     {
         for (jj = 0; jj < params->nx; jj++)
         {
-            /* coordinates of (jj, ii) scaled to 'real world' terms */
+      
             const float x_pos = jj*(BOX_X_SIZE/params->nx);
             const float y_pos = ii*(BOX_Y_SIZE/params->ny);
 
@@ -249,7 +298,8 @@ void initialise(const char* param_file, accel_area_t * accel_area,
                 }
             }
         }
-    }
+     }
+*/
 
     free(obstacles);
 }

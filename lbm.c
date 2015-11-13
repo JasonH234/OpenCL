@@ -162,11 +162,11 @@ int main(int argc, char* argv[])
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_collision,2,NULL,global,local,0, NULL, NULL);
 
       err |= clEnqueueNDRangeKernel(lbm_context.queue,lbm_context.k_velocity,1,NULL,&g, &l,0,NULL,NULL);
-
-      if(err != CL_SUCCESS)
+      
+     if(err != CL_SUCCESS)
 	DIE("OpenCL error %d, could not run kernel",err);
       
-      cl_float * results = (cl_float*) malloc(sizeof(cl_float)*(GROUPSIZE));
+     cl_float * results = (cl_float*) malloc(sizeof(cl_float)*(GROUPSIZE));
       err = clEnqueueReadBuffer(lbm_context.queue, lbm_context.d_results, CL_TRUE, 0, 
 				      sizeof(cl_float)*(GROUPSIZE),results,0,NULL,NULL);
 
@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
 	    av_vels[ii] = av_vels[ii]/ (float) tot_cells;
 
 	    free(results);
-
+      
        #ifdef DEBUG
         printf("==timestep: %d==\n", ii);
         printf("av velocity: %.12E\n", av_vels[ii]);
